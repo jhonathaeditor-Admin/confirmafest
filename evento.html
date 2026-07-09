@@ -1,0 +1,1078 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ConfirmaFest — Evento</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <style>
+    :root{--cream:#FAF7F2;--warm:#FDF9F4;--gold:#C9A96E;--gold-l:#E8D5B0;--dark:#1A1612;--brown:#3D2B1F;--muted:#8C7B6B;--green:#4A7C59;--red:#8B3A3A;--border:#E8E0D5;}
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--dark);min-height:100vh;}
+
+    /* HEADER */
+    header{background:var(--dark);padding:14px 32px;display:flex;align-items:center;justify-content:space-between;gap:16px;}
+    .hback{font-size:13px;color:#888;cursor:pointer;text-decoration:none;transition:color .2s;white-space:nowrap;}
+    .hback:hover{color:var(--gold-l);}
+    .hlogo{font-family:'Cormorant Garamond',serif;font-size:18px;font-weight:300;color:var(--gold-l);letter-spacing:2px;flex:1;text-align:center;}
+    .hlogo span{color:var(--gold);font-style:italic;}
+    .hright{display:flex;align-items:center;gap:12px;font-size:12px;color:#888;white-space:nowrap;}
+    .hbadge{background:#2A2420;color:var(--gold);padding:3px 10px;border-radius:99px;font-size:11px;font-weight:500;}
+    .btn-sair{background:none;border:1px solid #444;color:#888;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:12px;font-family:'DM Sans',sans-serif;transition:all .2s;}
+    .btn-sair:hover{border-color:var(--gold);color:var(--gold-l);}
+
+    /* TABS */
+    .tabs-wrap{background:white;border-bottom:1px solid var(--border);padding:0 32px;display:flex;gap:2px;overflow-x:auto;}
+    .tab-btn{padding:14px 20px;border:none;background:none;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;transition:all .2s;white-space:nowrap;}
+    .tab-btn.active{color:var(--dark);border-bottom-color:var(--gold);}
+    .tab-btn:hover{color:var(--dark);}
+
+    /* CONTAINER */
+    .container{max-width:1100px;margin:0 auto;padding:36px 24px;}
+    .tab-content{display:none;}
+    .tab-content.active{display:block;}
+
+    /* SECTION */
+    .sec-title{font-family:'Cormorant Garamond',serif;font-size:26px;font-weight:300;color:var(--brown);margin-bottom:6px;}
+    .sec-sub{font-size:13px;color:var(--muted);margin-bottom:28px;}
+
+    /* CARD */
+    .card{background:white;border:1px solid var(--border);border-radius:14px;padding:26px;margin-bottom:20px;}
+    .card-title{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:16px;}
+
+    /* FORM */
+    .fg{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;}
+    .ff label{display:block;font-size:11px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px;}
+    .ff input,.ff textarea,.ff select{width:100%;padding:10px 13px;border:1px solid var(--border);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:14px;background:var(--warm);outline:none;transition:border .2s;color:var(--dark);}
+    .ff input:focus,.ff textarea:focus,.ff select:focus{border-color:var(--gold);}
+    .ff textarea{min-height:120px;resize:vertical;}
+
+    /* BUTTONS */
+    .btn{padding:10px 22px;border:none;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:500;cursor:pointer;transition:all .2s;}
+    .btn-dark{background:var(--dark);color:var(--gold-l);}
+    .btn-dark:hover{background:var(--brown);}
+    .btn-gold{background:var(--gold);color:white;}
+    .btn-gold:hover:not(:disabled){background:#B8935A;}
+    .btn-gold:disabled{opacity:.5;cursor:not-allowed;}
+    .btn-out{background:transparent;border:1px solid var(--border);color:var(--dark);}
+    .btn-out:hover{border-color:var(--gold);}
+    .btn-sm{padding:6px 13px;font-size:12px;}
+    .btn-g{background:var(--green);color:white;}
+    .btn-r{background:var(--red);color:white;}
+    .btns-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:4px;}
+
+    /* MSG PREVIEW */
+    .msg-preview{background:#DCF8C6;border-radius:12px 12px 12px 2px;padding:14px 18px;font-size:13px;line-height:1.7;max-width:400px;white-space:pre-wrap;color:var(--dark);border:1px solid #B2E5A0;margin-top:10px;}
+
+    /* UPLOAD ZONE */
+    .upload-zone{border:2px dashed var(--gold-l);border-radius:12px;padding:44px;text-align:center;cursor:pointer;transition:all .2s;background:var(--warm);}
+    .upload-zone:hover{border-color:var(--gold);background:#FDF6EC;}
+    .upload-zone h3{font-family:'Cormorant Garamond',serif;font-size:20px;font-weight:400;color:var(--brown);margin-bottom:6px;}
+    .upload-zone p{font-size:13px;color:var(--muted);}
+    #file-input{display:none;}
+
+    /* STATS */
+    .stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px;}
+    .stat{background:white;border:1px solid var(--border);border-radius:12px;padding:18px;text-align:center;}
+    .stat-n{font-family:'Cormorant Garamond',serif;font-size:34px;font-weight:300;color:var(--brown);line-height:1;}
+    .stat-n.g{color:var(--green);} .stat-n.r{color:var(--red);} .stat-n.y{color:var(--gold);}
+    .stat-l{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-top:4px;}
+
+    /* PROGRESS */
+    .prog-bar{height:6px;background:var(--border);border-radius:99px;overflow:hidden;margin-bottom:24px;}
+    .prog-fill{height:100%;background:linear-gradient(90deg,var(--green),var(--gold));border-radius:99px;transition:width .4s;}
+
+    /* TABLE */
+    .tbl-wrap{overflow-x:auto;}
+    table{width:100%;border-collapse:collapse;font-size:13px;}
+    th{text-align:left;padding:10px 13px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);border-bottom:1px solid var(--border);font-weight:500;}
+    td{padding:11px 13px;border-bottom:1px solid #F5F0EA;vertical-align:middle;}
+    tr:hover td{background:var(--warm);}
+    .badge{display:inline-block;padding:3px 10px;border-radius:99px;font-size:11px;font-weight:500;}
+    .b-pend{background:#FFF8E7;color:#B8860B;}
+    .b-sent{background:#E3F2FD;color:#1565C0;}
+    .b-conf{background:#E8F5E9;color:#2E7D32;}
+    .b-decl{background:#FFEBEE;color:#C62828;}
+
+    /* IMPORT PROGRESS */
+    .import-log{max-height:160px;overflow-y:auto;font-size:12px;color:var(--muted);background:var(--warm);border-radius:8px;padding:12px;margin-top:12px;display:none;}
+
+    /* DISPARO LOG */
+    .disp-log{max-height:200px;overflow-y:auto;font-size:12px;color:var(--muted);background:var(--warm);border-radius:8px;padding:12px;margin-top:12px;}
+
+    /* QR */
+    .qr-wrap{display:flex;align-items:center;gap:32px;padding:24px;background:var(--warm);border-radius:12px;border:1px solid var(--border);}
+    #qr-canvas{width:180px;height:180px;flex-shrink:0;background:white;border-radius:10px;display:flex;align-items:center;justify-content:center;overflow:hidden;}
+    .qr-info h3{font-family:'Cormorant Garamond',serif;font-size:20px;font-weight:400;color:var(--brown);margin-bottom:8px;}
+    .qr-url{font-size:12px;color:var(--muted);font-family:monospace;background:var(--cream);padding:8px 12px;border-radius:8px;margin:10px 0;word-break:break-all;}
+
+    /* CREDENCIAIS */
+    .cred-box{background:var(--cream);border-radius:10px;padding:14px 18px;margin-bottom:10px;}
+    .cred-box label{font-size:11px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;}
+    .cred-val{font-family:monospace;font-size:16px;color:var(--dark);margin-top:4px;}
+
+    /* ===== MODAL REVISÃO HUMANA ===== */
+    .overlay{display:none;position:fixed;inset:0;background:rgba(26,22,18,.72);backdrop-filter:blur(4px);z-index:100;align-items:center;justify-content:center;padding:20px;}
+    .overlay.open{display:flex;}
+    .modal{background:white;border-radius:18px;width:100%;max-width:760px;max-height:88vh;display:flex;flex-direction:column;box-shadow:0 32px 80px rgba(0,0,0,.32);overflow:hidden;}
+    .mhead{padding:22px 26px 16px;border-bottom:1px solid var(--border);flex-shrink:0;}
+    .mbadge{display:inline-flex;align-items:center;gap:6px;background:#FFF8E7;border:1px solid #F0D070;color:#7A5C1E;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;padding:3px 10px;border-radius:99px;margin-bottom:8px;}
+    .mtitle{font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:400;color:var(--brown);}
+    .msub{font-size:13px;color:var(--muted);margin-top:3px;}
+    .mclose{position:absolute;top:20px;right:22px;background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted);}
+    .mtoolbar{padding:10px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-shrink:0;background:var(--warm);}
+    .mtoolbar input{flex:1;max-width:240px;padding:8px 12px;border:1px solid var(--border);border-radius:7px;font-family:'DM Sans',sans-serif;font-size:13px;background:white;outline:none;}
+    .mtoolbar input:focus{border-color:var(--gold);}
+    .msel-info{font-size:13px;color:var(--muted);margin-left:auto;}
+    .msel-info b{color:var(--dark);}
+    .mbody{flex:1;overflow-y:auto;}
+    .rev-table{width:100%;border-collapse:collapse;font-size:13px;}
+    .rev-table thead{position:sticky;top:0;background:white;z-index:1;}
+    .rev-table th{padding:9px 13px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);border-bottom:2px solid var(--border);font-weight:500;text-align:left;}
+    .rev-table td{padding:10px 13px;border-bottom:1px solid #F5F0EA;vertical-align:middle;}
+    .rev-table tr.unchecked td{opacity:.38;text-decoration:line-through;}
+    .rev-table input[type=checkbox]{width:16px;height:16px;accent-color:var(--gold);cursor:pointer;padding:0;border:none;background:none;}
+    .msg-snip{font-size:11px;color:var(--muted);max-width:240px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .mfoot{padding:16px 26px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-shrink:0;background:white;}
+    .mfoot-sum{font-size:13px;color:var(--muted);}
+    .mfoot-sum b{color:var(--dark);}
+    .mfoot-warn{font-size:12px;color:#8B5A00;background:#FFF8E7;border:1px solid #F0D070;border-radius:8px;padding:7px 12px;margin-top:7px;display:none;}
+
+    /* ALERT INFO */
+    .info-alert{background:#FFF8E7;border-left:3px solid var(--gold);border-radius:8px;padding:12px 16px;font-size:13px;color:#7A5C1E;line-height:1.6;margin-top:12px;}
+
+    /* ERROR */
+    .err-msg{background:#FFEBEE;color:#C62828;padding:10px 14px;border-radius:8px;font-size:13px;margin-top:10px;display:none;}
+
+    /* TOAST */
+    .toast{position:fixed;bottom:28px;right:28px;background:var(--dark);color:var(--gold-l);padding:12px 20px;border-radius:10px;font-size:13px;transform:translateY(60px);opacity:0;transition:all .3s;z-index:999;max-width:320px;}
+    .toast.show{transform:translateY(0);opacity:1;}
+
+    /* SPINNER */
+    .spin{display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,.3);border-top-color:white;border-radius:50%;animation:rot .7s linear infinite;vertical-align:middle;margin-right:5px;}
+    @keyframes rot{to{transform:rotate(360deg);}}
+
+    @media(max-width:768px){
+      .stats-row{grid-template-columns:repeat(2,1fr);}
+      .fg{grid-template-columns:1fr;}
+      .tabs-wrap{padding:0 16px;}
+      .container{padding:24px 16px;}
+      .qr-wrap{flex-direction:column;text-align:center;}
+      header{padding:12px 16px;}
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <a class="hback" onclick="window.location.href='index.html'">← Eventos</a>
+  <div class="hlogo">✦ <span>ConfirmaFest</span></div>
+  <div class="hright">
+    <span id="h-nome"></span>
+    <span class="hbadge" id="h-papel"></span>
+    <button class="btn-sair" onclick="sair()">Sair</button>
+  </div>
+</header>
+
+<div class="tabs-wrap">
+  <button class="tab-btn" id="tab-btn-config"     onclick="switchTab('config')">⚙ Configuração</button>
+  <button class="tab-btn" id="tab-btn-convidados" onclick="switchTab('convidados')">📋 Convidados</button>
+  <button class="tab-btn" id="tab-btn-disparo"    onclick="switchTab('disparo')">📨 Disparo</button>
+  <button class="tab-btn" id="tab-btn-painel"     onclick="switchTab('painel')">📊 Painel</button>
+  <button class="tab-btn" id="tab-btn-acesso"     onclick="switchTab('acesso')">🔗 Acesso</button>
+</div>
+
+<div class="container">
+
+  <!-- ========== TAB: CONFIGURAÇÃO ========== -->
+  <div class="tab-content" id="tab-config">
+    <div class="sec-title" id="cfg-titulo">Carregando...</div>
+    <div class="sec-sub">Dados do evento e template da mensagem de convite</div>
+
+    <div class="card">
+      <div class="card-title">Dados do Evento</div>
+      <div class="fg">
+        <div class="ff" style="grid-column:1/-1"><label>Nome dos Noivos</label><input id="c-noivos" type="text"></div>
+        <div class="ff"><label>Data do Evento</label><input id="c-data" type="date"></div>
+        <div class="ff"><label>Horário</label><input id="c-horario" type="text" placeholder="16h00"></div>
+        <div class="ff" style="grid-column:1/-1"><label>Local</label><input id="c-local" type="text"></div>
+        <div class="ff"><label>Data Limite para Confirmar</label><input id="c-limite" type="date"></div>
+        <div class="ff"><label>Nome da Assessora</label><input id="c-assessora" type="text"></div>
+        <div class="ff" style="grid-column:1/-1"><label>Contato da Assessora (WhatsApp / e-mail)</label><input id="c-contato" type="text"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Mensagem de Convite</div>
+      <div class="ff"><label>Template — Variáveis: {nome} {noivos} {data} {horario} {local} {dataLimite} {assessora} {link}</label>
+        <textarea id="c-template" oninput="updatePreview()"></textarea>
+      </div>
+      <div style="font-size:13px;color:var(--muted);margin-top:10px">📱 Preview (com dados de exemplo):</div>
+      <div class="msg-preview" id="c-preview"></div>
+    </div>
+
+    <div class="btns-row">
+      <button class="btn btn-dark" id="btn-salvar-cfg" onclick="salvarConfig()">Salvar Alterações</button>
+    </div>
+  </div>
+
+  <!-- ========== TAB: CONVIDADOS ========== -->
+  <div class="tab-content" id="tab-convidados">
+    <div class="sec-title">Convidados</div>
+    <div class="sec-sub">Importe a planilha ou adicione manualmente</div>
+
+    <div class="card">
+      <div class="card-title">Importar Planilha</div>
+      <div class="upload-zone" onclick="document.getElementById('file-input').click()" id="upload-zone">
+        <div style="font-size:40px;margin-bottom:12px">📂</div>
+        <h3>Clique ou arraste o arquivo</h3>
+        <p>Formatos: .xlsx, .xls, .csv<br>Colunas: <b>Nome Responsável · Telefone · Dependente 1 · Dependente 2 · ...</b></p>
+      </div>
+      <input type="file" id="file-input" accept=".xlsx,.xls,.csv" onchange="importarArquivo(event)">
+      <div class="btns-row" style="margin-top:14px">
+        <button class="btn btn-out btn-sm" onclick="baixarModelo()">📥 Baixar planilha modelo</button>
+      </div>
+      <div class="import-log" id="import-log"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Adicionar Manualmente</div>
+      <div class="fg">
+        <div class="ff"><label>Nome do Responsável</label><input id="m-nome" type="text" placeholder="Maria Silva"></div>
+        <div class="ff"><label>Telefone (com DDD)</label><input id="m-tel" type="text" placeholder="44 99999-8888"></div>
+      </div>
+      <div id="deps-wrap"></div>
+      <div class="btns-row">
+        <button class="btn btn-out btn-sm" onclick="addDep()">+ Dependente</button>
+        <button class="btn btn-gold btn-sm" onclick="adicionarManual()">Adicionar →</button>
+      </div>
+      <div class="err-msg" id="m-err"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Lista de Convidados (<span id="total-resp">0</span> responsáveis · <span id="total-pess">0</span> pessoas)</div>
+      <div style="display:flex;gap:10px;margin-bottom:14px">
+        <input type="text" style="flex:1;padding:9px 13px;border:1px solid var(--border);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;background:var(--warm);outline:none;" placeholder="Buscar..." oninput="renderConvidados(this.value)">
+        <button class="btn btn-out btn-sm" onclick="carregarConvidados()">↺ Atualizar</button>
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Responsável</th><th>Telefone</th><th>Grupo</th><th>Status Envio</th><th>Ações</th></tr></thead>
+          <tbody id="conv-tbody"><tr><td colspan="5" style="text-align:center;color:var(--muted);padding:28px">Nenhum convidado ainda</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== TAB: DISPARO ========== -->
+  <div class="tab-content" id="tab-disparo">
+    <div class="sec-title">Disparo de Mensagens</div>
+    <div class="sec-sub">Envie os convites via WhatsApp. Toda lista passa por revisão antes do envio.</div>
+
+    <div class="stats-row">
+      <div class="stat"><div class="stat-n" id="d-total">0</div><div class="stat-l">Total</div></div>
+      <div class="stat"><div class="stat-n y" id="d-pend">0</div><div class="stat-l">Pendentes</div></div>
+      <div class="stat"><div class="stat-n" style="color:#1565C0" id="d-sent">0</div><div class="stat-l">Enviados</div></div>
+      <div class="stat"><div class="stat-n g" id="d-conf">0</div><div class="stat-l">Confirmados</div></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">🔗 Conexão Evolution API (WhatsApp)</div>
+      <div class="fg">
+        <div class="ff"><label>URL da instância</label><input id="ev-url" type="text" placeholder="https://sua-instancia.evolutionapi.com" value="http://localhost:8080"></div>
+        <div class="ff"><label>API Key</label><input id="ev-key" type="password" placeholder="sua-api-key"></div>
+        <div class="ff" style="grid-column:1/-1"><label>Nome da instância</label><input id="ev-inst" type="text" placeholder="eloisa-casamentos" value="eloisa-casamentos"></div>
+      </div>
+      <div class="info-alert">💡 <b>Evolution API</b> é gratuita e open source. Precisa de uma instância rodando. Sem ela, use o <b>Modo Simulação</b> para testar o fluxo completo.</div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Opções de Envio</div>
+      <div class="fg">
+        <div class="ff"><label>Intervalo entre mensagens (segundos)</label><input id="intervalo" type="number" value="5" min="2" max="60"></div>
+        <div class="ff"><label>Enviar para</label>
+          <select id="filtro-envio">
+            <option value="all">Todos os responsáveis</option>
+            <option value="pending">Apenas pendentes (não enviados)</option>
+          </select>
+        </div>
+      </div>
+      <div class="btns-row">
+        <button class="btn btn-gold" id="btn-disparo" onclick="abrirRevisao(false)">📨 Iniciar Disparo</button>
+        <button class="btn btn-out" id="btn-pausar" onclick="pausarDisparo()" disabled>⏸ Pausar</button>
+        <button class="btn btn-out" onclick="abrirRevisao(true)">🎭 Modo Simulação</button>
+      </div>
+    </div>
+
+    <div id="disp-wrap" style="display:none">
+      <div class="card">
+        <div class="card-title">Progresso</div>
+        <div style="font-size:13px;color:var(--muted);margin-bottom:8px">Enviando: <b id="disp-count">0/0</b></div>
+        <div class="prog-bar"><div class="prog-fill" id="disp-prog" style="width:0%"></div></div>
+        <div class="disp-log" id="disp-log"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== TAB: PAINEL ========== -->
+  <div class="tab-content" id="tab-painel">
+    <div class="sec-title">Painel de Confirmações</div>
+    <div class="sec-sub">Atualização em tempo real conforme os convidados respondem</div>
+
+    <div class="stats-row">
+      <div class="stat"><div class="stat-n" id="p-total">0</div><div class="stat-l">Total Pessoas</div></div>
+      <div class="stat"><div class="stat-n g" id="p-conf">0</div><div class="stat-l">✅ Confirmados</div></div>
+      <div class="stat"><div class="stat-n r" id="p-decl">0</div><div class="stat-l">❌ Recusados</div></div>
+      <div class="stat"><div class="stat-n y" id="p-pend">0</div><div class="stat-l">⏳ Pendentes</div></div>
+    </div>
+    <div class="prog-bar"><div class="prog-fill" id="p-prog" style="width:0%"></div></div>
+
+    <div class="card">
+      <div style="display:flex;gap:10px;margin-bottom:14px;align-items:center">
+        <input type="text" style="flex:1;padding:9px 13px;border:1px solid var(--border);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;background:var(--warm);outline:none;" placeholder="Buscar..." oninput="renderPainel(this.value)">
+        <button class="btn btn-out btn-sm" onclick="carregarPainel()">↺</button>
+        <button class="btn btn-out btn-sm" onclick="exportarRelatorio()">📥 Exportar</button>
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Pessoa</th>
+              <th>Responsável (grupo)</th>
+              <th>Status</th>
+              <th>Respondido em</th>
+              <th id="th-acoes" style="display:none">Ações</th>
+            </tr>
+          </thead>
+          <tbody id="painel-tbody"><tr><td colspan="5" style="text-align:center;color:var(--muted);padding:28px">Carregando...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== TAB: ACESSO ========== -->
+  <div class="tab-content" id="tab-acesso">
+    <div class="sec-title">Acesso e QR Code</div>
+    <div class="sec-sub">Link e QR Code para os convidados confirmarem presença</div>
+
+    <div class="card">
+      <div class="card-title">QR Code do Evento (para o convite físico)</div>
+      <div class="qr-wrap">
+        <div id="qr-canvas"></div>
+        <div class="qr-info">
+          <h3>Escaneie para confirmar</h3>
+          <p style="font-size:13px;color:var(--muted);line-height:1.6;margin-bottom:8px">
+            Este QR Code leva para a página de confirmação. O convidado informa o número de WhatsApp para se identificar.<br><br>
+            Cole no convite físico, banner ou post nas redes sociais do casal.
+          </p>
+          <div class="qr-url" id="qr-url-text">Gerando link...</div>
+          <button class="btn btn-out btn-sm" onclick="copiarLink()">📋 Copiar link</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" id="card-credenciais">
+      <div class="card-title">Credenciais dos Noivos</div>
+      <p style="font-size:13px;color:var(--muted);margin-bottom:16px">Envie estas credenciais manualmente para os noivos (WhatsApp, e-mail, etc.)</p>
+      <div class="fg">
+        <div>
+          <div class="cred-box">
+            <label>Usuário</label>
+            <div class="cred-val" id="cred-login">—</div>
+          </div>
+        </div>
+        <div>
+          <div class="cred-box">
+            <label>Senha</label>
+            <div class="cred-val" id="cred-senha">—</div>
+          </div>
+        </div>
+      </div>
+      <div style="font-size:13px;color:var(--muted);margin-top:4px">Link de acesso: <b><a id="cred-link" href="index.html" style="color:var(--gold)">index.html</a></b></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Planilha Modelo</div>
+      <p style="font-size:13px;color:var(--muted);margin-bottom:14px">Baixe o modelo para preencher e importar na aba Convidados.</p>
+      <button class="btn btn-out" onclick="baixarModelo()">📥 Baixar modelo .xlsx</button>
+    </div>
+  </div>
+
+</div><!-- /container -->
+
+<!-- ===== MODAL: REVISÃO HUMANA ===== -->
+<div class="overlay" id="modal-revisao" style="position:fixed">
+  <div class="modal" style="position:relative">
+    <button class="mclose" onclick="fecharModal()">✕</button>
+    <div class="mhead">
+      <div class="mbadge">⚠️ Revisão obrigatória</div>
+      <div class="mtitle">Conferir antes de disparar</div>
+      <div class="msub">Desmarque quem não deve receber e confirme o envio.</div>
+    </div>
+    <div class="mtoolbar">
+      <input type="text" placeholder="🔍 Buscar..." oninput="renderRevisaoTable(this.value)" id="rev-search">
+      <button class="btn btn-out btn-sm" onclick="selTodos(true)">Marcar todos</button>
+      <button class="btn btn-out btn-sm" onclick="selTodos(false)">Desmarcar</button>
+      <div class="msel-info">Selecionados: <b id="rev-count">0</b></div>
+    </div>
+    <div class="mbody">
+      <table class="rev-table">
+        <thead><tr>
+          <th style="width:40px"><input type="checkbox" id="rev-all" onchange="selTodos(this.checked)"></th>
+          <th>#</th><th>Responsável</th><th>Telefone</th><th>Grupo</th><th>Preview da mensagem</th>
+        </tr></thead>
+        <tbody id="rev-tbody"></tbody>
+      </table>
+    </div>
+    <div class="mfoot">
+      <div>
+        <div class="mfoot-sum">Serão enviadas <b id="rev-total">0</b> mensagens de <b id="rev-grand">0</b>.</div>
+        <div class="mfoot-warn" id="rev-warn">⚠️ Selecione ao menos um para continuar.</div>
+      </div>
+      <div style="display:flex;gap:10px">
+        <button class="btn btn-out" onclick="fecharModal()">Cancelar</button>
+        <button class="btn btn-gold" id="btn-confirmar-rev" onclick="confirmarDisparo()">✅ Confirmar e Disparar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ==========================================
+// ⚙ CONFIGURAÇÃO — substitua pelos dados do seu projeto Supabase
+const SUPABASE_URL = 'https://pmybjjftrfcjlkqikcsw.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_xc7TXXd__meeKFLB106Otg_sdEiknLY';
+// ==========================================
+
+const { createClient } = supabase;
+const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
+const BASE_URL = window.location.href.replace(/[^/]*(\?.*)?$/, '');
+
+let eventoId, eventoData, session;
+let responsaveis = [], todasPessoas = [];
+let alvoRevisao = [], modoSimulacao = false;
+let disparando = false, disparoPaused = false;
+let realtimeChannel = null;
+
+// ===========================
+// INIT
+// ===========================
+window.addEventListener('load', init);
+
+async function init() {
+  session = JSON.parse(localStorage.getItem('cf_session') || 'null');
+  if (!session) { window.location.href = 'index.html'; return; }
+
+  eventoId = new URLSearchParams(window.location.search).get('id');
+  if (!eventoId) { window.location.href = 'index.html'; return; }
+
+  if (session.papel === 'noivos' && session.evento_id !== eventoId) {
+    window.location.href = 'index.html'; return;
+  }
+
+  const { data, error } = await sb.from('eventos').select('*').eq('id', eventoId).single();
+  if (error || !data) { window.location.href = 'index.html'; return; }
+  eventoData = data;
+
+  // Header
+  document.getElementById('h-nome').textContent = session.nome;
+  document.getElementById('h-papel').textContent = session.papel === 'assessora' ? '👑 Assessora' : '💍 Noivos';
+
+  // Permissões
+  if (session.papel !== 'assessora') {
+    document.getElementById('tab-btn-disparo').style.display = 'none';
+    document.getElementById('btn-salvar-cfg').style.display  = 'none';
+    document.getElementById('card-credenciais').style.display = 'none';
+  } else {
+    document.getElementById('th-acoes').style.display = '';
+  }
+
+  await switchTab('config');
+}
+
+function sair() {
+  localStorage.removeItem('cf_session');
+  window.location.href = 'index.html';
+}
+
+// ===========================
+// TABS
+// ===========================
+async function switchTab(name) {
+  document.querySelectorAll('.tab-btn').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+  const btn = document.getElementById(`tab-btn-${name}`);
+  const tab = document.getElementById(`tab-${name}`);
+  if (btn) btn.classList.add('active');
+  if (tab) tab.classList.add('active');
+
+  if (realtimeChannel && name !== 'painel') {
+    await sb.removeChannel(realtimeChannel); realtimeChannel = null;
+  }
+
+  if (name === 'config')     loadConfig();
+  if (name === 'convidados') carregarConvidados();
+  if (name === 'disparo')    atualizarStatsDisparo();
+  if (name === 'painel')     iniciarPainel();
+  if (name === 'acesso')     loadAcesso();
+}
+
+// ===========================
+// TAB: CONFIGURAÇÃO
+// ===========================
+function loadConfig() {
+  const d = eventoData;
+  document.getElementById('cfg-titulo').textContent = d.nome_noivos;
+  document.getElementById('c-noivos').value   = d.nome_noivos   || '';
+  document.getElementById('c-data').value     = d.data_evento   || '';
+  document.getElementById('c-horario').value  = d.horario       || '';
+  document.getElementById('c-local').value    = d.local_evento  || '';
+  document.getElementById('c-limite').value   = d.data_limite   || '';
+  document.getElementById('c-assessora').value= d.nome_assessora|| '';
+  document.getElementById('c-contato').value  = d.contato_assessora || '';
+  document.getElementById('c-template').value = d.template_mensagem || '';
+  updatePreview();
+}
+
+async function salvarConfig() {
+  const btn = document.getElementById('btn-salvar-cfg');
+  btn.textContent = 'Salvando...'; btn.disabled = true;
+
+  const upd = {
+    nome_noivos: document.getElementById('c-noivos').value.trim(),
+    data_evento: document.getElementById('c-data').value,
+    horario:     document.getElementById('c-horario').value.trim(),
+    local_evento:document.getElementById('c-local').value.trim(),
+    data_limite: document.getElementById('c-limite').value,
+    nome_assessora:    document.getElementById('c-assessora').value.trim(),
+    contato_assessora: document.getElementById('c-contato').value.trim(),
+    template_mensagem: document.getElementById('c-template').value
+  };
+
+  const { error } = await sb.from('eventos').update(upd).eq('id', eventoId);
+  btn.textContent = 'Salvar Alterações'; btn.disabled = false;
+
+  if (error) { toast('❌ Erro ao salvar: ' + error.message); return; }
+  eventoData = { ...eventoData, ...upd };
+  toast('✅ Configurações salvas!');
+}
+
+function updatePreview() {
+  const d = eventoData || {};
+  const templ = document.getElementById('c-template').value;
+  const fmted = templ
+    .replace(/{nome}/g, 'Maria')
+    .replace(/{noivos}/g, document.getElementById('c-noivos')?.value || d.nome_noivos || 'Ana & João')
+    .replace(/{data}/g, fmtDate(document.getElementById('c-data')?.value || d.data_evento))
+    .replace(/{horario}/g, document.getElementById('c-horario')?.value || d.horario || '16h00')
+    .replace(/{local}/g, document.getElementById('c-local')?.value || d.local_evento || 'Local do Evento')
+    .replace(/{dataLimite}/g, fmtDate(document.getElementById('c-limite')?.value || d.data_limite))
+    .replace(/{assessora}/g, document.getElementById('c-assessora')?.value || d.nome_assessora || 'Eloisa')
+    .replace(/{link}/g, BASE_URL + 'confirmar.html?id=abc123...');
+  const el = document.getElementById('c-preview');
+  if (el) el.textContent = fmted;
+}
+
+// ===========================
+// TAB: CONVIDADOS
+// ===========================
+let depCount = 0;
+
+function addDep() {
+  depCount++;
+  const wrap = document.getElementById('deps-wrap');
+  const div = document.createElement('div');
+  div.className = 'fg'; div.id = `dep-row-${depCount}`;
+  div.innerHTML = `
+    <div class="ff" style="grid-column:1/-1;display:flex;gap:10px;align-items:flex-end">
+      <div style="flex:1"><label>Dependente ${depCount}</label><input type="text" id="dep-${depCount}" placeholder="Nome completo"></div>
+      <button class="btn btn-out btn-sm" style="height:39px" onclick="document.getElementById('dep-row-${depCount}').remove()">✕</button>
+    </div>`;
+  wrap.appendChild(div);
+}
+
+async function adicionarManual() {
+  const nome = document.getElementById('m-nome').value.trim();
+  const telRaw = document.getElementById('m-tel').value.trim().replace(/\D/g, '');
+  const errEl = document.getElementById('m-err');
+  errEl.style.display = 'none';
+
+  if (!nome || telRaw.length < 8) {
+    errEl.textContent = 'Preencha nome e telefone válido.';
+    errEl.style.display = 'block'; return;
+  }
+
+  const tel = telRaw.startsWith('55') ? telRaw : '55' + telRaw;
+
+  const { data: resp, error: e1 } = await sb.from('responsaveis')
+    .insert({ evento_id: eventoId, nome, telefone: tel }).select().single();
+
+  if (e1) { errEl.textContent = 'Erro: ' + e1.message; errEl.style.display = 'block'; return; }
+
+  const pessoas = [{ responsavel_id: resp.id, evento_id: eventoId, nome, is_responsavel: true }];
+  for (let i = 1; i <= depCount; i++) {
+    const dep = document.getElementById(`dep-${i}`)?.value.trim();
+    if (dep) pessoas.push({ responsavel_id: resp.id, evento_id: eventoId, nome: dep, is_responsavel: false });
+  }
+
+  await sb.from('pessoas').insert(pessoas);
+
+  document.getElementById('m-nome').value = '';
+  document.getElementById('m-tel').value = '';
+  document.getElementById('deps-wrap').innerHTML = '';
+  depCount = 0;
+  toast(`✅ ${nome} adicionado com ${pessoas.length} pessoa(s)!`);
+  await carregarConvidados();
+}
+
+async function importarArquivo(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const ext = file.name.split('.').pop().toLowerCase();
+  const log = document.getElementById('import-log');
+  log.style.display = 'block'; log.innerHTML = '⏳ Lendo arquivo...';
+
+  const reader = new FileReader();
+  reader.onload = async e => {
+    let rows = [];
+    if (ext === 'csv') {
+      rows = e.target.result.split('\n').map(l => l.split(/[,;]/));
+    } else {
+      const wb = XLSX.read(e.target.result, { type: 'array' });
+      rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1 });
+    }
+
+    // Detect and skip header row
+    const firstRow = (rows[0] || []).map(c => String(c||'').toLowerCase());
+    const startIdx = firstRow.some(c => c.includes('nome') || c.includes('resp')) ? 1 : 0;
+    const dataRows = rows.slice(startIdx).filter(r => String(r[0]||'').trim());
+
+    log.innerHTML = `📋 ${dataRows.length} linhas encontradas. Importando...<br>`;
+    let ok = 0, erros = 0;
+
+    for (const row of dataRows) {
+      const nomeResp = String(row[0]||'').trim();
+      const telRaw   = String(row[1]||'').replace(/\D/g,'');
+      if (!nomeResp || telRaw.length < 8) continue;
+      const tel = telRaw.startsWith('55') ? telRaw : '55' + telRaw;
+
+      const { data: resp, error: e1 } = await sb.from('responsaveis')
+        .insert({ evento_id: eventoId, nome: nomeResp, telefone: tel }).select().single();
+
+      if (e1) { erros++; log.innerHTML += `<span style="color:var(--red)">❌ ${nomeResp}: ${e1.message}</span><br>`; continue; }
+
+      const pArr = [{ responsavel_id: resp.id, evento_id: eventoId, nome: nomeResp, is_responsavel: true }];
+      for (let i = 2; i <= 9; i++) {
+        const dep = String(row[i]||'').trim();
+        if (dep) pArr.push({ responsavel_id: resp.id, evento_id: eventoId, nome: dep, is_responsavel: false });
+      }
+      await sb.from('pessoas').insert(pArr);
+      ok++;
+      log.innerHTML += `<span style="color:var(--green)">✅ ${nomeResp} (${pArr.length} pessoa${pArr.length>1?'s':''})</span><br>`;
+      log.scrollTop = log.scrollHeight;
+    }
+
+    log.innerHTML += `<br><b>Concluído: ${ok} importados, ${erros} erros.</b>`;
+    await carregarConvidados();
+  };
+
+  if (ext === 'csv') reader.readAsText(file, 'UTF-8');
+  else reader.readAsArrayBuffer(file);
+  event.target.value = '';
+}
+
+async function carregarConvidados() {
+  const { data: resps } = await sb.from('responsaveis').select('*').eq('evento_id', eventoId).order('criado_em');
+  const { data: pess }  = await sb.from('pessoas').select('*').eq('evento_id', eventoId);
+  responsaveis  = resps  || [];
+  todasPessoas  = pess   || [];
+  renderConvidados('');
+}
+
+function renderConvidados(filter = '') {
+  const filtrados = responsaveis.filter(r =>
+    r.nome.toLowerCase().includes(filter.toLowerCase()) ||
+    r.telefone.includes(filter)
+  );
+  document.getElementById('total-resp').textContent = responsaveis.length;
+  document.getElementById('total-pess').textContent = todasPessoas.length;
+
+  const tbody = document.getElementById('conv-tbody');
+  if (!filtrados.length) {
+    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:28px">Nenhum convidado encontrado</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = filtrados.map(r => {
+    const grupo = todasPessoas.filter(p => p.responsavel_id === r.id);
+    const stLabel = r.mensagem_enviada
+      ? `<span class="badge b-sent">Enviado</span>`
+      : `<span class="badge b-pend">Pendente</span>`;
+    return `<tr>
+      <td><b>${r.nome}</b></td>
+      <td style="font-family:monospace;font-size:12px">${r.telefone}</td>
+      <td>${grupo.length} pessoa${grupo.length !== 1 ? 's' : ''}</td>
+      <td>${stLabel}</td>
+      <td>
+        ${session.papel === 'assessora' ? `<button class="btn btn-out btn-sm" onclick="excluirResponsavel('${r.id}')">✕</button>` : ''}
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+async function excluirResponsavel(id) {
+  if (!confirm('Excluir este responsável e todas as pessoas do grupo?')) return;
+  await sb.from('responsaveis').delete().eq('id', id);
+  await carregarConvidados();
+  toast('Responsável removido.');
+}
+
+function baixarModelo() {
+  const ws = XLSX.utils.aoa_to_sheet([
+    ['Nome Responsável','Telefone','Dependente 1','Dependente 2','Dependente 3','Dependente 4','Dependente 5','Dependente 6','Dependente 7','Dependente 8'],
+    ['Maria Silva','44999990001','João Silva','Pedro Silva','Ana Silva','','','','',''],
+    ['Carlos Souza','44999990002','','','','','','','',''],
+    ['Família Pereira','44999990003','Lucia Pereira','Bruno Pereira','','','','','','']
+  ]);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Convidados');
+  XLSX.writeFile(wb, 'modelo-confirmafest.xlsx');
+}
+
+// Drag & drop upload
+const zone = document.getElementById('upload-zone');
+zone.addEventListener('dragover', e => { e.preventDefault(); zone.style.borderColor='var(--gold)'; });
+zone.addEventListener('dragleave', () => { zone.style.borderColor='var(--gold-l)'; });
+zone.addEventListener('drop', e => {
+  e.preventDefault(); zone.style.borderColor='var(--gold-l)';
+  const file = e.dataTransfer.files[0];
+  if (file) {
+    const input = document.getElementById('file-input');
+    const dt = new DataTransfer(); dt.items.add(file); input.files = dt.files;
+    importarArquivo({ target: input });
+  }
+});
+
+// ===========================
+// TAB: DISPARO
+// ===========================
+async function atualizarStatsDisparo() {
+  await carregarConvidados();
+  const total = responsaveis.length;
+  const sent  = responsaveis.filter(r => r.mensagem_enviada).length;
+  const pend  = total - sent;
+  const conf  = todasPessoas.filter(p => p.status === 'confirmed').length;
+  setEl('d-total', total); setEl('d-pend', pend);
+  setEl('d-sent', sent);   setEl('d-conf', conf);
+}
+
+function buildMsg(resp) {
+  const link = BASE_URL + `confirmar.html?id=${resp.id}`;
+  return eventoData.template_mensagem
+    .replace(/{nome}/g,      resp.nome)
+    .replace(/{noivos}/g,    eventoData.nome_noivos)
+    .replace(/{data}/g,      fmtDate(eventoData.data_evento))
+    .replace(/{horario}/g,   eventoData.horario)
+    .replace(/{local}/g,     eventoData.local_evento)
+    .replace(/{dataLimite}/g,fmtDate(eventoData.data_limite))
+    .replace(/{assessora}/g, eventoData.nome_assessora)
+    .replace(/{link}/g,      link);
+}
+
+async function enviarMensagem(resp) {
+  const url  = document.getElementById('ev-url').value.trim().replace(/\/$/,'');
+  const key  = document.getElementById('ev-key').value.trim();
+  const inst = document.getElementById('ev-inst').value.trim();
+  const res  = await fetch(`${url}/message/sendText/${inst}`, {
+    method: 'POST',
+    headers: { 'Content-Type':'application/json', 'apikey': key },
+    body: JSON.stringify({ number: resp.telefone, text: buildMsg(resp) })
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+}
+
+// MODAL REVISÃO
+function abrirRevisao(simulacao) {
+  modoSimulacao = simulacao;
+  const filtro = document.getElementById('filtro-envio').value;
+  alvoRevisao = responsaveis
+    .filter(r => filtro === 'pending' ? !r.mensagem_enviada : true)
+    .map(r => ({ ...r, _sel: true }));
+
+  if (!alvoRevisao.length) { toast('⚠️ Nenhum responsável para enviar.'); return; }
+
+  const titulo = document.querySelector('#modal-revisao .mtitle');
+  titulo.textContent = simulacao ? '🎭 Revisão — Modo Simulação' : 'Conferir antes de disparar';
+
+  renderRevisaoTable('');
+  document.getElementById('rev-search').value = '';
+  document.getElementById('modal-revisao').classList.add('open');
+  atualizarFooter();
+}
+
+function fecharModal() {
+  document.getElementById('modal-revisao').classList.remove('open');
+}
+
+function renderRevisaoTable(filter = '') {
+  const filtrados = alvoRevisao.filter(r =>
+    r.nome.toLowerCase().includes(filter.toLowerCase()) || r.telefone.includes(filter)
+  );
+  const tbody = document.getElementById('rev-tbody');
+  tbody.innerHTML = filtrados.map((r, i) => {
+    const snip = buildMsg(r).replace(/\n/g,' ').substring(0, 70) + '…';
+    const grupo = todasPessoas.filter(p => p.responsavel_id === r.id).length;
+    return `
+      <tr class="${r._sel ? '' : 'unchecked'}" id="revr-${r.id}">
+        <td><input type="checkbox" ${r._sel ? 'checked' : ''} onchange="toggleRev('${r.id}',this.checked)"></td>
+        <td style="color:var(--muted);font-size:12px">${i+1}</td>
+        <td><b>${r.nome}</b></td>
+        <td style="font-family:monospace;font-size:12px">${r.telefone}</td>
+        <td style="font-size:12px;color:var(--muted)">${grupo} pessoa${grupo!==1?'s':''}</td>
+        <td><div class="msg-snip" title="${buildMsg(r).replace(/"/g,"'")}">${snip}</div></td>
+      </tr>`;
+  }).join('');
+  atualizarFooter();
+}
+
+function toggleRev(id, checked) {
+  const r = alvoRevisao.find(r => r.id === id);
+  if (r) { r._sel = checked; const row = document.getElementById(`revr-${id}`); if (row) row.classList.toggle('unchecked', !checked); }
+  atualizarFooter();
+}
+
+function selTodos(checked) {
+  alvoRevisao.forEach(r => r._sel = checked);
+  document.getElementById('rev-all').checked = checked;
+  renderRevisaoTable(document.getElementById('rev-search').value);
+}
+
+function atualizarFooter() {
+  const sel = alvoRevisao.filter(r => r._sel).length;
+  const tot = alvoRevisao.length;
+  setEl('rev-count', sel); setEl('rev-total', sel); setEl('rev-grand', tot);
+  document.getElementById('rev-warn').style.display      = sel === 0 ? 'block' : 'none';
+  document.getElementById('btn-confirmar-rev').disabled  = sel === 0;
+  document.getElementById('rev-all').checked    = sel === tot && tot > 0;
+  document.getElementById('rev-all').indeterminate = sel > 0 && sel < tot;
+}
+
+async function confirmarDisparo() {
+  const aprovados = alvoRevisao.filter(r => r._sel);
+  fecharModal();
+  if (modoSimulacao) await executarSimulacao(aprovados);
+  else               await executarDisparo(aprovados);
+}
+
+async function executarDisparo(alvo) {
+  disparando = true; disparoPaused = false;
+  const intervalo = parseInt(document.getElementById('intervalo').value) * 1000;
+  const log = document.getElementById('disp-log');
+  document.getElementById('disp-wrap').style.display = 'block';
+  document.getElementById('btn-disparo').disabled = true;
+  document.getElementById('btn-pausar').disabled  = false;
+  log.innerHTML = `<div style="color:var(--gold)">📋 ${alvo.length} aprovados. Iniciando...</div>`;
+
+  for (let i = 0; i < alvo.length; i++) {
+    if (!disparando) break;
+    while (disparoPaused) await sleep(500);
+    const r = alvo[i];
+    setEl('disp-count', `${i+1}/${alvo.length}`);
+    document.getElementById('disp-prog').style.width = ((i+1)/alvo.length*100)+'%';
+    try {
+      await enviarMensagem(r);
+      await sb.from('responsaveis').update({ mensagem_enviada: true, enviado_em: new Date().toISOString() }).eq('id', r.id);
+      log.innerHTML += `<div style="color:var(--green)">✅ ${r.nome}</div>`;
+    } catch(e) {
+      log.innerHTML += `<div style="color:var(--red)">❌ ${r.nome} — ${e.message}</div>`;
+    }
+    log.scrollTop = log.scrollHeight;
+    if (i < alvo.length - 1) await sleep(intervalo);
+  }
+
+  disparando = false;
+  document.getElementById('btn-disparo').disabled = false;
+  document.getElementById('btn-pausar').disabled  = true;
+  log.innerHTML += '<br><b>Disparo finalizado.</b>';
+  toast('🎉 Disparo concluído!');
+  await atualizarStatsDisparo();
+}
+
+async function executarSimulacao(alvo) {
+  const log = document.getElementById('disp-log');
+  document.getElementById('disp-wrap').style.display = 'block';
+  log.innerHTML = `<div style="color:var(--gold)">🎭 SIMULAÇÃO — ${alvo.length} aprovados.</div>`;
+
+  for (let i = 0; i < alvo.length; i++) {
+    await sleep(250);
+    const r = alvo[i];
+    setEl('disp-count', `${i+1}/${alvo.length}`);
+    document.getElementById('disp-prog').style.width = ((i+1)/alvo.length*100)+'%';
+    await sb.from('responsaveis').update({ mensagem_enviada: true, enviado_em: new Date().toISOString() }).eq('id', r.id);
+    log.innerHTML += `<div>📤 Simulado: ${r.nome}</div>`;
+    log.scrollTop = log.scrollHeight;
+  }
+
+  // Simular respostas de 60% dos grupos
+  await sleep(600);
+  const ps = alvo.flatMap(r => todasPessoas.filter(p => p.responsavel_id === r.id)).slice(0, Math.floor(alvo.length * 3 * 0.6));
+  for (const p of ps) {
+    const st = Math.random() > 0.25 ? 'confirmed' : 'declined';
+    await sb.from('pessoas').update({ status: st, respondido_em: new Date().toISOString() }).eq('id', p.id);
+  }
+
+  log.innerHTML += '<br><b>🎭 Simulação concluída! Veja o Painel.</b>';
+  toast('🎭 Simulação pronta! Abra o Painel.');
+  await atualizarStatsDisparo();
+}
+
+function pausarDisparo() {
+  disparoPaused = !disparoPaused;
+  document.getElementById('btn-pausar').textContent = disparoPaused ? '▶ Retomar' : '⏸ Pausar';
+}
+
+// ===========================
+// TAB: PAINEL
+// ===========================
+async function iniciarPainel() {
+  await carregarPainel();
+  // Realtime subscription
+  realtimeChannel = sb.channel(`painel-${eventoId}`)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'pessoas', filter: `evento_id=eq.${eventoId}` },
+      () => carregarPainel())
+    .subscribe();
+}
+
+async function carregarPainel() {
+  const { data } = await sb.from('pessoas')
+    .select('*, responsaveis(nome,telefone)')
+    .eq('evento_id', eventoId).order('criado_em');
+  todasPessoas = data || [];
+  renderPainel('');
+}
+
+function renderPainel(filter = '') {
+  const filtradas = todasPessoas.filter(p =>
+    p.nome.toLowerCase().includes(filter.toLowerCase()) ||
+    (p.responsaveis?.nome || '').toLowerCase().includes(filter.toLowerCase())
+  );
+  const total = todasPessoas.length;
+  const conf  = todasPessoas.filter(p => p.status === 'confirmed').length;
+  const decl  = todasPessoas.filter(p => p.status === 'declined').length;
+  const pend  = total - conf - decl;
+  const pct   = total > 0 ? Math.round((conf+decl)/total*100) : 0;
+
+  setEl('p-total', total); setEl('p-conf', conf); setEl('p-decl', decl); setEl('p-pend', pend);
+  document.getElementById('p-prog').style.width = pct + '%';
+
+  const isA = session.papel === 'assessora';
+  const tbody = document.getElementById('painel-tbody');
+  if (!filtradas.length) {
+    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:28px">Nenhuma pessoa ainda</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = filtradas.map(p => {
+    const badgeClass = { confirmed:'b-conf', declined:'b-decl', pending:'b-pend' }[p.status] || 'b-pend';
+    const badgeLabel = { confirmed:'✅ Confirmado', declined:'❌ Recusado', pending:'⏳ Pendente' }[p.status] || '⏳ Pendente';
+    const resp = p.responsaveis;
+    const acoesHtml = isA ? `
+      <td>
+        <button class="btn btn-g btn-sm" onclick="overrideStatus('${p.id}','confirmed')" title="Confirmar" style="margin-right:4px">✅</button>
+        <button class="btn btn-r btn-sm" onclick="overrideStatus('${p.id}','declined')" title="Recusar">❌</button>
+      </td>` : '';
+    return `<tr>
+      <td><b>${p.nome}</b>${p.is_responsavel ? ' <span style="font-size:10px;color:var(--gold);font-weight:600">TITULAR</span>' : ''}</td>
+      <td style="font-size:12px;color:var(--muted)">${resp?.nome || '—'}</td>
+      <td><span class="badge ${badgeClass}">${badgeLabel}</span></td>
+      <td style="font-size:12px;color:var(--muted)">${p.respondido_em ? new Date(p.respondido_em).toLocaleString('pt-BR') : '—'}</td>
+      ${acoesHtml}
+    </tr>`;
+  }).join('');
+}
+
+async function overrideStatus(pessoaId, status) {
+  if (session.papel !== 'assessora') return;
+  await sb.from('pessoas').update({ status, respondido_em: new Date().toISOString() }).eq('id', pessoaId);
+  await carregarPainel();
+  toast(status === 'confirmed' ? '✅ Confirmado!' : '❌ Marcado como recusado.');
+}
+
+function exportarRelatorio() {
+  const rows = [['Nome','Responsável','Status','Respondido em']];
+  todasPessoas.forEach(p => rows.push([
+    p.nome,
+    p.responsaveis?.nome || '',
+    { confirmed:'Confirmado', declined:'Recusado', pending:'Pendente' }[p.status] || '',
+    p.respondido_em ? new Date(p.respondido_em).toLocaleString('pt-BR') : ''
+  ]));
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Confirmações');
+  XLSX.writeFile(wb, `relatorio-${eventoData.nome_noivos.replace(/\s/g,'-')}.xlsx`);
+  toast('📥 Relatório exportado!');
+}
+
+// ===========================
+// TAB: ACESSO
+// ===========================
+let qrGerado = false;
+
+async function loadAcesso() {
+  const qrUrl = BASE_URL + `confirmar.html?evento=${eventoId}`;
+  document.getElementById('qr-url-text').textContent = qrUrl;
+
+  if (!qrGerado) {
+    document.getElementById('qr-canvas').innerHTML = '';
+    new QRCode(document.getElementById('qr-canvas'), {
+      text: qrUrl, width: 180, height: 180,
+      colorDark: '#1A1612', colorLight: '#FAF7F2'
+    });
+    qrGerado = true;
+  }
+
+  if (session.papel === 'assessora') {
+    const { data: noivos } = await sb
+      .from('usuarios').select('login,senha').eq('evento_id', eventoId).eq('papel','noivos').single();
+    if (noivos) {
+      setEl('cred-login', noivos.login);
+      setEl('cred-senha', noivos.senha);
+    }
+    const link = document.getElementById('cred-link');
+    link.href = BASE_URL + 'index.html';
+    link.textContent = BASE_URL + 'index.html';
+  }
+}
+
+async function copiarLink() {
+  const url = document.getElementById('qr-url-text').textContent;
+  try {
+    await navigator.clipboard.writeText(url);
+    toast('📋 Link copiado!');
+  } catch { toast('Selecione o link manualmente para copiar.'); }
+}
+
+// ===========================
+// UTILS
+// ===========================
+function toast(msg, dur = 3500) {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), dur);
+}
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+function fmtDate(d) { return d ? new Date(d+'T00:00:00').toLocaleDateString('pt-BR') : ''; }
+function setEl(id, val) { const el = document.getElementById(id); if (el) el.textContent = val; }
+
+// Fechar modal com ESC / clique fora
+document.addEventListener('keydown', e => { if (e.key === 'Escape') fecharModal(); });
+document.getElementById('modal-revisao').addEventListener('click', e => {
+  if (e.target === document.getElementById('modal-revisao')) fecharModal();
+});
+</script>
+</body>
+</html>

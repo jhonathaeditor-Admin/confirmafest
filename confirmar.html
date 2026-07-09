@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Confirmar Presença — ConfirmaFest</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    :root {
+      --cream: #FAF7F2; --warm: #FDF9F4; --gold: #C9A96E;
+      --gold-l: #E8D5B0; --dark: #1A1612; --brown: #3D2B1F;
+      --muted: #8C7B6B; --green: #4A7C59; --red: #8B3A3A;
+      --border: #E8E0D5;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--cream);
+      color: var(--dark);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .screen { display: none; width: 100%; max-width: 500px; }
+    .screen.active { display: block; }
+    .card {
+      background: white;
+      border-radius: 20px;
+      padding: 40px 32px;
+      box-shadow: 0 8px 40px rgba(0,0,0,.08);
+    }
+    .logo {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 14px;
+      letter-spacing: 3px;
+      color: var(--gold);
+      text-align: center;
+      margin-bottom: 28px;
+      text-transform: uppercase;
+    }
+    .icon { font-size: 48px; text-align: center; margin-bottom: 16px; }
+    h1 {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 26px;
+      font-weight: 300;
+      color: var(--brown);
+      margin-bottom: 8px;
+      line-height: 1.3;
+      text-align: center;
+    }
+    .sub {
+      font-size: 14px; color: var(--muted);
+      margin-bottom: 24px; line-height: 1.6; text-align: center;
+    }
+    .info-box {
+      background: var(--cream);
+      border-radius: 12px;
+      padding: 14px 18px;
+      margin-bottom: 24px;
+    }
+    .info-box div { font-size: 13px; color: var(--muted); margin-bottom: 5px; }
+    .info-box div:last-child { margin-bottom: 0; }
+    .info-box b { color: var(--dark); }
+    label {
+      display: block; font-size: 12px; font-weight: 500;
+      color: var(--muted); text-transform: uppercase;
+      letter-spacing: .5px; margin-bottom: 6px;
+    }
+    input[type=tel] {
+      width: 100%; padding: 12px 16px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 16px; outline: none;
+      background: var(--warm); transition: border .2s;
+      margin-bottom: 12px;
+    }
+    input[type=tel]:focus { border-color: var(--gold); }
+    .btn {
+      width: 100%; padding: 14px; border: none;
+      border-radius: 10px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 15px; font-weight: 500;
+      cursor: pointer; transition: all .2s; margin-bottom: 10px;
+    }
+    .btn-gold { background: var(--gold); color: white; }
+    .btn-gold:hover:not(:disabled) { background: #B8935A; }
+    .btn-gold:disabled { opacity: .55; cursor: not-allowed; }
+    .err {
+      background: #FFEBEE; color: #C62828;
+      padding: 10px 14px; border-radius: 8px;
+      font-size: 13px; margin-bottom: 14px; display: none;
+    }
+    /* Pessoa card */
+    .pessoas-list { margin-bottom: 20px; }
+    .pcard {
+      display: flex; align-items: center;
+      justify-content: space-between;
+      padding: 14px 16px; border-radius: 12px;
+      border: 1px solid var(--border);
+      margin-bottom: 10px; background: var(--warm);
+      transition: all .2s;
+    }
+    .pcard.confirmed { border-color: var(--green); background: #EDFBF1; }
+    .pcard.declined  { border-color: var(--red);   background: #FFF0F0; }
+    .pinfo { flex: 1; }
+    .ptag  { font-size: 10px; color: var(--gold); font-weight: 600; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 2px; }
+    .pnome { font-size: 15px; font-weight: 500; }
+    .pstatus { font-size: 12px; color: var(--muted); margin-top: 2px; }
+    .pbtns { display: flex; gap: 8px; flex-shrink: 0; margin-left: 12px; }
+    .btg {
+      padding: 7px 13px; border-radius: 8px;
+      font-size: 13px; font-weight: 500; cursor: pointer;
+      background: white; transition: all .2s;
+    }
+    .bsim { border: 1px solid var(--green); color: var(--green); }
+    .bsim.on { background: var(--green); color: white; }
+    .bnao { border: 1px solid var(--red); color: var(--red); }
+    .bnao.on { background: var(--red); color: white; }
+    .progress-lbl { font-size: 13px; color: var(--muted); text-align: center; margin-bottom: 16px; }
+    /* Assessora box */
+    .abox {
+      background: #FFF8E7; border: 1px solid #F0D070;
+      border-radius: 12px; padding: 18px; text-align: center; margin-top: 8px;
+    }
+    .abox b { display: block; font-size: 17px; color: #5A3C0E; margin-bottom: 6px; font-family: 'Cormorant Garamond', serif; font-weight: 400; }
+    .abox p { font-size: 14px; color: #7A5C1E; }
+    /* Spinner */
+    .spin {
+      width: 36px; height: 36px;
+      border: 3px solid var(--border); border-top-color: var(--gold);
+      border-radius: 50%; animation: rot .8s linear infinite;
+      margin: 0 auto 16px;
+    }
+    @keyframes rot { to { transform: rotate(360deg); } }
+    /* Resumo obrigado */
+    .resumo { background: var(--cream); border-radius: 12px; padding: 16px; margin-top: 14px; }
+    .ri { display: flex; align-items: flex-start; gap: 10px; font-size: 14px; margin-bottom: 8px; }
+    .ri:last-child { margin-bottom: 0; }
+    .ri.ok { color: var(--green); }
+    .ri.no { color: var(--red); }
+    @media (max-width: 480px) {
+      .card { padding: 28px 18px; }
+      .pbtns { flex-direction: column; gap: 6px; }
+      .btg { font-size: 12px; padding: 6px 10px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ===== LOADING ===== -->
+<div class="screen active" id="s-loading">
+  <div class="card">
+    <div class="logo">✦ ConfirmaFest</div>
+    <div class="spin"></div>
+    <p style="text-align:center;color:var(--muted);font-size:14px">Carregando...</p>
+  </div>
+</div>
+
+<!-- ===== ERRO (token inválido) ===== -->
+<div class="screen" id="s-error">
+  <div class="card">
+    <div class="logo">✦ ConfirmaFest</div>
+    <div class="icon">🔒</div>
+    <h1>Link inválido</h1>
+    <p class="sub">Este link não é válido ou expirou. Entre em contato com a assessoria do evento para mais informações.</p>
+  </div>
+</div>
+
+<!-- ===== TELEFONE (modo QR Code) ===== -->
+<div class="screen" id="s-phone">
+  <div class="card">
+    <div class="logo">✦ ConfirmaFest</div>
+    <div class="icon">💍</div>
+    <h1 id="ph-titulo"></h1>
+    <div class="info-box" id="ph-info"></div>
+    <label>Seu número de WhatsApp (com DDD)</label>
+    <input type="tel" id="inp-tel" placeholder="44 99999-8888" maxlength="16">
+    <div class="err" id="ph-err">Número não encontrado. Verifique o DDD e o número ou entre em contato com a assessoria.</div>
+    <button class="btn btn-gold" onclick="buscarTelefone()">Continuar →</button>
+  </div>
+</div>
+
+<!-- ===== PRAZO ENCERRADO ===== -->
+<div class="screen" id="s-prazo">
+  <div class="card">
+    <div class="logo">✦ ConfirmaFest</div>
+    <div class="icon">⏰</div>
+    <h1>Prazo encerrado</h1>
+    <p class="sub">O período de confirmação de presença foi encerrado. Para confirmar, entre em contato com a assessoria:</p>
+    <div class="abox">
+      <b id="prazo-nome"></b>
+      <p id="prazo-contato"></p>
+    </div>
+  </div>
+</div>
+
+<!-- ===== CONFIRMAÇÃO ===== -->
+<div class="screen" id="s-conf">
+  <div class="card">
+    <div class="logo">✦ ConfirmaFest</div>
+    <div class="icon">💍</div>
+    <h1 id="conf-titulo"></h1>
+    <p class="sub">Confirme a presença de cada pessoa do seu grupo.</p>
+    <div class="info-box" id="conf-info"></div>
+    <p class="progress-lbl" id="conf-prog"></p>
+    <div class="pessoas-list" id="conf-pessoas"></div>
+    <div class="err" id="conf-err"></div>
+    <button class="btn btn-gold" id="btn-salvar" onclick="salvar()">✓ Salvar confirmações</button>
+  </div>
+</div>
+
+<!-- ===== OBRIGADO ===== -->
+<div class="screen" id="s-ok">
+  <div class="card">
+    <div class="logo">✦ ConfirmaFest</div>
+    <div class="icon">🎉</div>
+    <h1>Obrigado!</h1>
+    <p class="sub" id="ok-msg"></p>
+    <div class="resumo" id="ok-resumo"></div>
+  </div>
+</div>
+
+<script>
+// ==========================================
+// ⚙ CONFIGURAÇÃO — substitua pelos dados do seu projeto Supabase
+const SUPABASE_URL = 'https://pmybjjftrfcjlkqikcsw.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_xc7TXXd__meeKFLB106Otg_sdEiknLY';
+// ==========================================
+
+const { createClient } = supabase;
+const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let evento = null, resp = null, pessoas = [], conf = {};
+
+// ===== INIT =====
+window.addEventListener('load', async () => {
+  try {
+    const p = new URLSearchParams(window.location.search);
+    const id     = p.get('id');     // modo WhatsApp: UUID do responsável
+    const evtId  = p.get('evento'); // modo QR: UUID do evento
+
+    if      (id)    await modoWhatsApp(id);
+    else if (evtId) await modoQR(evtId);
+    else            show('s-error');
+  } catch(e) {
+    console.error(e);
+    show('s-error');
+  }
+});
+
+// ===== MODO WHATSAPP (link único) =====
+async function modoWhatsApp(id) {
+  const { data, error } = await sb
+    .from('responsaveis')
+    .select('*, eventos(*)')
+    .eq('id', id)
+    .single();
+
+  if (error || !data) { show('s-error'); return; }
+
+  resp   = data;
+  evento = data.eventos;
+
+  if (!checkPrazo()) return;
+  await loadPessoas(resp.id);
+  showConf();
+}
+
+// ===== MODO QR (fallback) =====
+async function modoQR(evtId) {
+  const { data, error } = await sb
+    .from('eventos').select('*').eq('id', evtId).single();
+
+  if (error || !data) { show('s-error'); return; }
+
+  evento = data;
+  document.getElementById('ph-titulo').textContent = `Casamento de ${data.nome_noivos}`;
+  document.getElementById('ph-info').innerHTML = infoHtml(data);
+  show('s-phone');
+}
+
+// ===== BUSCA POR TELEFONE =====
+async function buscarTelefone() {
+  const raw = document.getElementById('inp-tel').value.replace(/\D/g,'');
+  const errEl = document.getElementById('ph-err');
+  errEl.style.display = 'none';
+
+  if (raw.length < 8) {
+    errEl.textContent = 'Informe um número válido com DDD.';
+    errEl.style.display = 'block'; return;
+  }
+
+  const { data: resps } = await sb
+    .from('responsaveis').select('*').eq('evento_id', evento.id);
+
+  const found = resps?.find(r => {
+    const t = r.telefone.replace(/\D/g,'');
+    return t === raw || t === '55'+raw || t.endsWith(raw) || raw.endsWith(t.slice(-8));
+  });
+
+  if (!found) { errEl.style.display = 'block'; return; }
+
+  resp = found;
+  if (!checkPrazo()) return;
+  await loadPessoas(found.id);
+  showConf();
+}
+
+// ===== VERIFICAR PRAZO =====
+function checkPrazo() {
+  if (new Date() > new Date(evento.data_limite + 'T23:59:59')) {
+    document.getElementById('prazo-nome').textContent    = evento.nome_assessora;
+    document.getElementById('prazo-contato').textContent = evento.contato_assessora;
+    show('s-prazo');
+    return false;
+  }
+  return true;
+}
+
+// ===== CARREGAR PESSOAS =====
+async function loadPessoas(respId) {
+  const { data } = await sb
+    .from('pessoas').select('*')
+    .eq('responsavel_id', respId).order('criado_em');
+
+  pessoas = data || [];
+  pessoas.forEach(p => { if (p.status !== 'pending') conf[p.id] = p.status; });
+}
+
+// ===== MOSTRAR TELA DE CONFIRMAÇÃO =====
+function showConf() {
+  document.getElementById('conf-titulo').textContent = `Casamento de ${evento.nome_noivos}`;
+  document.getElementById('conf-info').innerHTML = infoHtml(evento) +
+    `<div>⏰ Confirme até <b>${fmtDate(evento.data_limite)}</b></div>`;
+  renderPessoas();
+  show('s-conf');
+}
+
+// ===== RENDER PESSOAS =====
+function renderPessoas() {
+  const c = document.getElementById('conf-pessoas');
+  const r = Object.keys(conf).length;
+  document.getElementById('conf-prog').textContent =
+    `${r} de ${pessoas.length} ${pessoas.length === 1 ? 'pessoa respondida' : 'pessoas respondidas'}`;
+
+  c.innerHTML = pessoas.map(p => {
+    const st = conf[p.id] || 'pending';
+    const stLabel = st === 'confirmed' ? '✅ Vai comparecer' : st === 'declined' ? '❌ Não vai comparecer' : 'Aguardando resposta';
+    return `
+      <div class="pcard ${st}" id="pc-${p.id}">
+        <div class="pinfo">
+          ${p.is_responsavel ? '<div class="ptag">Titular do grupo</div>' : ''}
+          <div class="pnome">${p.nome}</div>
+          <div class="pstatus">${stLabel}</div>
+        </div>
+        <div class="pbtns">
+          <button class="btg bsim ${st==='confirmed'?'on':''}" onclick="toggle('${p.id}','confirmed')">✅ Sim</button>
+          <button class="btg bnao ${st==='declined'?'on':''}"  onclick="toggle('${p.id}','declined')">❌ Não</button>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+// ===== TOGGLE =====
+function toggle(id, status) {
+  conf[id] = status;
+  document.getElementById('conf-err').style.display = 'none';
+  renderPessoas();
+}
+
+// ===== SALVAR =====
+async function salvar() {
+  const faltam = pessoas.filter(p => !conf[p.id]);
+  const errEl  = document.getElementById('conf-err');
+
+  if (faltam.length > 0) {
+    errEl.textContent = `Confirme todas as pessoas antes de salvar. ${faltam.length > 1 ? 'Faltam' : 'Falta'}: ${faltam.map(p=>p.nome).join(', ')}.`;
+    errEl.style.display = 'block'; return;
+  }
+
+  const btn = document.getElementById('btn-salvar');
+  btn.disabled = true; btn.textContent = 'Salvando...';
+  errEl.style.display = 'none';
+
+  try {
+    for (const p of pessoas) {
+      await sb.from('pessoas').update({
+        status: conf[p.id], respondido_em: new Date().toISOString()
+      }).eq('id', p.id);
+    }
+
+    const sim = pessoas.filter(p => conf[p.id] === 'confirmed');
+    const nao = pessoas.filter(p => conf[p.id] === 'declined');
+
+    document.getElementById('ok-msg').textContent =
+      `Confirmação registrada para o casamento de ${evento.nome_noivos}!`;
+
+    document.getElementById('ok-resumo').innerHTML = [
+      sim.length ? `<div class="ri ok">✅ <span><b>Vão comparecer:</b> ${sim.map(p=>p.nome).join(', ')}</span></div>` : '',
+      nao.length ? `<div class="ri no">❌ <span><b>Não vão:</b> ${nao.map(p=>p.nome).join(', ')}</span></div>` : ''
+    ].join('');
+
+    show('s-ok');
+  } catch(e) {
+    btn.disabled = false; btn.textContent = '✓ Salvar confirmações';
+    errEl.textContent = 'Erro ao salvar. Verifique sua conexão e tente novamente.';
+    errEl.style.display = 'block';
+  }
+}
+
+// ===== UTILS =====
+function show(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+function fmtDate(d) {
+  return d ? new Date(d+'T00:00:00').toLocaleDateString('pt-BR') : '';
+}
+function infoHtml(evt) {
+  return `
+    <div>📅 <b>${fmtDate(evt.data_evento)}</b> às <b>${evt.horario}</b></div>
+    <div>📍 <b>${evt.local_evento}</b></div>`;
+}
+</script>
+</body>
+</html>
