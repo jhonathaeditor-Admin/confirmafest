@@ -96,7 +96,7 @@
     </div>
     <div class="lf">
       <label>Senha</label>
-      <input type="password" id="l-pass" placeholder="••••••••" autocomplete="current-password"
+      <input type="password" id="l-pass" placeholder="········" autocomplete="current-password"
         onkeydown="if(event.key==='Enter')login()">
     </div>
     <button class="btn-login" onclick="login()">Entrar →</button>
@@ -194,23 +194,18 @@
 <div class="toast" id="toast"></div>
 
 <script>
-// ==========================================
-// ⚙ CONFIGURAÇÃO — substitua pelos dados do seu projeto Supabase
 const SUPABASE_URL = 'https://pmybjjftrfcjlkqikcsw.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_xc7TXXd__meeKFLB106Otg_sdEiknLY';
-// ==========================================
 
 const { createClient } = supabase;
 const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
 let session = null;
 
-// ===== INIT =====
 window.addEventListener('load', () => {
   session = JSON.parse(localStorage.getItem('cf_session') || 'null');
   if (session) mostrarDash();
 });
 
-// ===== LOGIN =====
 async function login() {
   const user  = document.getElementById('l-user').value.trim();
   const pass  = document.getElementById('l-pass').value;
@@ -223,12 +218,6 @@ async function login() {
     errEl.style.display = 'block'; return;
   }
 
-  // Verificar se as credenciais do Supabase foram configuradas
-  if (SUPABASE_URL === 'https://pmybjjftrfcjlkqikcsw.supabase.co' || SUPABASE_KEY === 'sb_publishable_xc7TXXd__meeKFLB106Otg_sdEiknLY') {
-    errEl.textContent = '⚠️ Supabase não configurado. Substitua SUPABASE_URL e SUPABASE_KEY no arquivo index.html.';
-    errEl.style.display = 'block'; return;
-  }
-
   btn.textContent = 'Entrando...'; btn.disabled = true;
 
   try {
@@ -237,7 +226,7 @@ async function login() {
       .eq('login', user).eq('senha', pass).limit(1);
 
     if (error) {
-      errEl.textContent = '❌ Erro de conexão: ' + error.message;
+      errEl.textContent = 'Erro de conexão: ' + error.message;
       errEl.style.display = 'block'; return;
     }
 
@@ -257,14 +246,13 @@ async function login() {
     }
 
   } catch(e) {
-    errEl.textContent = '❌ Erro inesperado: ' + e.message + '. Verifique sua URL e Chave do Supabase.';
+    errEl.textContent = 'Erro inesperado: ' + e.message;
     errEl.style.display = 'block';
   } finally {
     btn.textContent = 'Entrar →'; btn.disabled = false;
   }
 }
 
-// ===== SAIR =====
 function sair() {
   localStorage.removeItem('cf_session');
   session = null;
@@ -272,7 +260,6 @@ function sair() {
   document.getElementById('pg-login').style.display = 'flex';
 }
 
-// ===== DASHBOARD =====
 async function mostrarDash() {
   document.getElementById('pg-login').style.display = 'none';
   document.getElementById('pg-dash').style.display  = 'block';
@@ -322,7 +309,6 @@ function abrirEvento(id) {
   window.location.href = `evento.html?id=${id}`;
 }
 
-// ===== MODAL CRIAR EVENTO =====
 function abrirModal()  { document.getElementById('modal-criar').classList.add('open'); }
 function fecharModal() {
   document.getElementById('modal-criar').classList.remove('open');
@@ -357,7 +343,6 @@ Confirme sua presença até *{dataLimite}*:
 
 _{assessora} — Assessoria de Casamentos_`;
 
-  // Criar evento
   const { data: evt, error: e1 } = await sb.from('eventos').insert({
     nome_noivos: noivos, data_evento: data, horario,
     local_evento: local, data_limite: limite,
@@ -367,19 +352,17 @@ _{assessora} — Assessoria de Casamentos_`;
 
   if (e1) { errEl.textContent = 'Erro ao criar evento: ' + e1.message; errEl.style.display = 'block'; return; }
 
-  // Criar usuário dos noivos
   const { error: e2 } = await sb.from('usuarios').insert({
     nome: noivos, login: lgn, senha, papel: 'noivos', evento_id: evt.id
   });
 
-  if (e2) { errEl.textContent = 'Evento criado! Mas erro no login dos noivos: ' + e2.message; errEl.style.display = 'block'; return; }
+  if (e2) { errEl.textContent = 'Evento criado! Erro no login: ' + e2.message; errEl.style.display = 'block'; return; }
 
   fecharModal();
-  toast(`✅ Evento "${noivos}" criado com sucesso!`);
+  toast(`Evento "${noivos}" criado!`);
   await carregarEventos();
 }
 
-// ===== UTILS =====
 function toast(msg, dur = 3500) {
   const el = document.getElementById('toast');
   el.textContent = msg; el.classList.add('show');
