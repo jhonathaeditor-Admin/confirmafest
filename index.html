@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ConfirmaFest — Entrar</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+      :root {
+              --cream:#FAF7F2; --warm:#FDF9F4; --gold:#C9A96E; --gold-l:#E8D5B0;
+              --dark:#1A1612; --brown:#3D2B1F; --muted:#8C7B6B;
+              --green:#4A7C59; --red:#8B3A3A; --border:#E8E0D5;
+      }
+      *{box-sizing:border-box;margin:0;padding:0;}
+      body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--dark);min-height:100vh;}
+  
+      /* ---- LOGIN ---- */
+      #pg-login{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;}
+      .login-card{background:white;border-radius:20px;padding:48px 40px;width:100%;max-width:400px;box-shadow:0 8px 40px rgba(0,0,0,.08);text-align:center;}
+      .llogo{font-family:'Cormorant Garamond',serif;font-size:28px;font-weight:300;color:var(--brown);margin-bottom:4px;}
+      .llogo span{color:var(--gold);font-style:italic;}
+      .lsub{font-size:13px;color:var(--muted);margin-bottom:36px;}
+      .lf{margin-bottom:14px;text-align:left;}
+      .lf label{display:block;font-size:12px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;}
+      .lf input{width:100%;padding:12px 16px;border:1px solid var(--border);border-radius:10px;font-family:'DM Sans',sans-serif;font-size:15px;background:var(--warm);outline:none;transition:border .2s;}
+      .lf input:focus{border-color:var(--gold);}
+      .btn-login{width:100%;padding:14px;background:var(--dark);color:var(--gold-l);border:none;border-radius:10px;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:500;cursor:pointer;transition:all .2s;margin-top:8px;}
+      .btn-login:hover{background:var(--brown);}
+      .lerr{background:#FFEBEE;color:#C62828;padding:10px 14px;border-radius:8px;font-size:13px;margin-top:12px;display:none;}
+  
+      /* ---- HEADER ---- */
+      #pg-dash{display:none;}
+      header{background:var(--dark);padding:16px 40px;display:flex;align-items:center;justify-content:space-between;}
+      .hlogo{font-family:'Cormorant Garamond',serif;font-size:20px;font-weight:300;color:var(--gold-l);letter-spacing:2px;}
+      .hlogo span{color:var(--gold);font-style:italic;}
+      .huser{display:flex;align-items:center;gap:16px;font-size:13px;color:#888;}
+      .btn-sair{background:none;border:1px solid #444;color:#888;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:12px;font-family:'DM Sans',sans-serif;transition:all .2s;}
+      .btn-sair:hover{border-color:var(--gold);color:var(--gold-l);}
+  
+      /* ---- DASHBOARD ---- */
+      .dash-wrap{max-width:1100px;margin:0 auto;padding:40px 24px;}
+      .dash-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:32px;}
+      .dash-title{font-family:'Cormorant Garamond',serif;font-size:32px;font-weight:300;color:var(--brown);}
+      .btn-criar{padding:12px 24px;background:var(--gold);color:white;border:none;border-radius:10px;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:500;cursor:pointer;transition:all .2s;}
+      .btn-criar:hover{background:#B8935A;}
+      .eventos-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:20px;}
+      .ecard{background:white;border:1px solid var(--border);border-radius:16px;padding:24px;cursor:pointer;transition:all .25s;}
+      .ecard:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,.08);border-color:var(--gold-l);}
+      .ecard-nome{font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:400;color:var(--brown);margin-bottom:4px;}
+      .ecard-data{font-size:13px;color:var(--muted);margin-bottom:16px;}
+      .ecard-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
+      .smi{background:var(--cream);border-radius:8px;padding:8px;text-align:center;}
+      .smi-n{font-family:'Cormorant Garamond',serif;font-size:24px;font-weight:300;color:var(--brown);}
+      .smi-n.g{color:var(--green);} .smi-n.r{color:var(--red);} .smi-n.y{color:var(--gold);}
+      .smi-l{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;}
+      .empty{text-align:center;padding:60px 20px;color:var(--muted);}
+      .empty h3{font-family:'Cormorant Garamond',serif;font-size:24px;font-weight:300;color:var(--brown);margin-bottom:8px;}
+  
+      /* ---- MODAL CRIAR EVENTO ---- */
+      .overlay{display:none;position:fixed;inset:0;background:rgba(26,22,18,.7);backdrop-filter:blur(4px);z-index:100;align-items:center;justify-content:center;padding:20px;}
+      .overlay.open{display:flex;}
+      .modal{background:white;border-radius:18px;width:100%;max-width:620px;max-height:90vh;overflow-y:auto;box-shadow:0 32px 80px rgba(0,0,0,.3);}
+      .mhead{padding:24px 28px 0;display:flex;justify-content:space-between;align-items:center;}
+      .mtitle{font-family:'Cormorant Garamond',serif;font-size:24px;font-weight:400;color:var(--brown);}
+      .mclose{background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted);}
+      .mbody{padding:20px 28px;}
+      .msec{font-size:12px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:14px;margin-top:4px;}
+      .fg{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;}
+      .ff label{display:block;font-size:12px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;}
+      .ff input{width:100%;padding:10px 14px;border:1px solid var(--border);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:14px;background:var(--warm);outline:none;transition:border .2s;}
+      .ff input:focus{border-color:var(--gold);}
+      .divider{border:none;border-top:1px solid var(--border);margin:18px 0;}
+      .mfoot{padding:14px 28px 24px;display:flex;gap:10px;justify-content:flex-end;}
+      .btn-cancel{padding:10px 20px;background:transparent;border:1px solid var(--border);border-radius:8px;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:14px;}
+      .btn-save{padding:10px 24px;background:var(--gold);color:white;border:none;border-radius:8px;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:500;}
+      .btn-save:hover{background:#B8935A;}
+      .merr{background:#FFEBEE;color:#C62828;padding:10px 16px;border-radius:8px;font-size:13px;margin:0 28px 14px;display:none;}
+  
+      /* ---- TOAST ---- */
+      .toast{position:fixed;bottom:28px;right:28px;background:var(--dark);color:var(--gold-l);padding:12px 20px;border-radius:10px;font-size:13px;transform:translateY(60px);opacity:0;transition:all .3s;z-index:999;}
+      .toast.show{transform:translateY(0);opacity:1;}
+      @media(max-width:600px){header{padding:14px 20px;}.dash-wrap{padding:24px 16px;}.fg{grid-template-columns:1fr;}}
+    </style>
+</head>
+<body>
+
+  <!-- ===== LOGIN ===== -->
+  <div id="pg-login">
+      <div class="login-card">
+            <div class="llogo">✦ <span>ConfirmaFest</span></div>div>
+          <div class="lsub">Assessoria de Casamentos · Eloisa</div>div>
+          <div class="lf">
+                <label>Usuário</label>
+                <input type="text" id="l-user" placeholder="seu usuário" autocomplete="username">
+          </div>div>
+          <div class="lf">
+                <label>Senha</label>
+                <input type="password" id="l-pass" placeholder="••••••••" autocomplete="current-password"
+                          onkeydown="if(event.key==='Enter')login()">
+          </div>div>
+          <button class="btn-login" onclick="login()">Entrar →</button>button>
+          <div class="lerr" id="l-err">Usuário ou senha incorretos.</div>div>
+      </div>div>
+  </div>div>
+
+<!-- ===== DASHBOARD ===== -->
+<div id="pg-dash">
+  <header>
+        <div class="hlogo">✦ <span>ConfirmaFest</span></div>div>
+        <div class="huser">
+                <span id="h-nome"></span>
+                <button class="btn-sair" onclick="sair()">Sair</button>button>
+        </div>div>
+  </header>
+    <div class="dash-wrap">
+          <div class="dash-top">
+                  <div class="dash-title">Meus Eventos</div>div>
+                  <button class="btn-criar" onclick="abrirModal()">+ Criar Evento</button>button>
+          </div>div>
+          <div class="eventos-grid" id="ev-grid">
+                  <div class="empty" style="grid-column:1/-1">
+                            <div style="font-size:40px;margin-bottom:12px">💍</div>div>
+                            <h3>Carregando...</h3>
+                  </div>div>
+          </div>div>
+    </div>div>
+</div>div>
+
+<!-- ===== MODAL: CRIAR EVENTO ===== -->
+<div class="overlay" id="modal-criar">
+  <div class="modal">
+      <div class="mhead">
+            <div class="mtitle">Novo Evento</div>div>
+            <button class="mclose" onclick="fecharModal()">✕</button>button>
+      </div>div>
+      <div class="mbody">
+            <div class="msec">Dados do Casamento</div>div>
+            <div class="fg">
+                    <div class="ff" style="grid-column:1/-1">
+                              <label>Nome dos Noivos *</label>
+                              <input type="text" id="f-noivos" placeholder="Ana & João">
+                    </div>div>
+                    <div class="ff">
+                              <label>Data do Evento *</label>
+                              <input type="date" id="f-data">
+                    </div>div>
+                    <div class="ff">
+                              <label>Horário *</label>
+                              <input type="text" id="f-horario" placeholder="16h00">
+                    </div>div>
+                    <div class="ff" style="grid-column:1/-1">
+                              <label>Local *</label>
+                              <input type="text" id="f-local" placeholder="Espaço Vila dos Sonhos — Maringá, PR">
+                    </div>div>
+                    <div class="ff">
+                              <label>Data Limite para Confirmar *</label>
+                              <input type="date" id="f-limite">
+                    </div>div>
+            </div>div>
+            <hr class="divider">
+            <div class="msec">Assessoria</div>div>
+            <div class="fg">
+                    <div class="ff">
+                              <label>Nome da Assessora</label>
+                              <input type="text" id="f-assessora" value="Eloisa">
+                    </div>div>
+                    <div class="ff">
+                              <label>Contato (WhatsApp ou e-mail)</label>
+                              <input type="text" id="f-contato" placeholder="44 99999-0000">
+                    </div>div>
+            </div>div>
+            <hr class="divider">
+            <div class="msec">Acesso dos Noivos</div>div>
+            <div class="fg">
+                    <div class="ff">
+                              <label>Usuário *</label>
+                              <input type="text" id="f-login" placeholder="ana-joao-2025">
+                    </div>div>
+                    <div class="ff">
+                              <label>Senha *</label>
+                              <input type="text" id="f-senha" placeholder="defina uma senha">
+                    </div>div>
+            </div>div>
+      </div>div>
+      <div class="merr" id="m-err"></div>div>
+      <div class="mfoot">
+            <button class="btn-cancel" onclick="fecharModal()">Cancelar</button>button>
+            <button class="btn-save" onclick="criarEvento()">Criar Evento →</button>button>
+      </div>div>
+  </div>div>
+</div>div>
+
+<div class="toast" id="toast"></div>div>
+
+<script>
+const SUPABASE_URL = 'https://pmybjjftrfcjlkqikcsw.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_xc7TXXd__meeKFLB106Otg_sdEiknLY';
+
+const { createClient } = supabase;
+const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
+let session = null;
+
+window.addEventListener('load', () => {
+    session = JSON.parse(localStorage.getItem('cf_session') || 'null');
+    if (session) mostrarDash();
+});
+
+async function login() {
+    const user  = document.getElementById('l-user').value.trim();
+    const pass  = document.getElementById('l-pass').value;
+    const errEl = document.getElementById('l-err');
+    const btn   = document.querySelector('.btn-login');
+    errEl.style.display = 'none';
+  
+    if (!user || !pass) {
+          errEl.textContent = 'Preencha usuário e senha.';
+          errEl.style.display = 'block'; return;
+    }
+      
+        btn.textContent = 'Entrando...'; btn.disabled = true;
+  
+    try {
+          const { data, error } = await sb
+                  .from('usuarios').select('*')
+                  .eq('login', user).eq('senha', pass).limit(1);
+      
+          if (error) {
+                  errEl.textContent = 'Erro de conexão: ' + error.message;
+                  errEl.style.display = 'block'; return;
+          }
+            
+                if (!data || data.length === 0) {
+                        errEl.textContent = 'Usuário ou senha incorretos.';
+                        errEl.style.display = 'block'; return;
+                }
+                  
+                      const u = data[0];
+          session = { id: u.id, nome: u.nome, papel: u.papel, evento_id: u.evento_id };
+          localStorage.setItem('cf_session', JSON.stringify(session));
+      
+          if (u.papel === 'noivos') {
+                  window.location.href = `evento.html?id=${u.evento_id}`;
+          } else {
+                  mostrarDash();
+          }
+      
+    } catch(e) {
+          errEl.textContent = 'Erro inesperado: ' + e.message;
+          errEl.style.display = 'block';
+    } finally {
+          btn.textContent = 'Entrar →'; btn.disabled = false;
+    }
+}
+
+function sair() {
+    localStorage.removeItem('cf_session');
+    session = null;
+    document.getElementById('pg-dash').style.display  = 'none';
+    document.getElementById('pg-login').style.display = 'flex';
+}
+
+async function mostrarDash() {
+    document.getElementById('pg-login').style.display = 'none';
+    document.getElementById('pg-dash').style.display  = 'block';
+    document.getElementById('h-nome').textContent = session.nome;
+    await carregarEventos();
+}
+
+async function carregarEventos() {
+    const { data: evts, error } = await sb
+          .from('eventos').select('*').order('data_evento', { ascending: false });
+  
+    const grid = document.getElementById('ev-grid');
+    if (error) { grid.innerHTML = '<div class="empty"><h3>Erro ao carregar eventos.</h3></div>'; return; }
+      
+        if (!evts || evts.length === 0) {
+              grid.innerHTML = `
+                    <div class="empty" style="grid-column:1/-1">
+                            <div style="font-size:44px;margin-bottom:14px">💍</div>
+                                    <h3>Nenhum evento ainda</h3>
+                                            <p>Clique em "+ Criar Evento" para começar</p>
+                                                  </div>`;
+              return;
+        }
+          
+            const html = await Promise.all(evts.map(async evt => {
+                  const { data: ps } = await sb.from('pessoas').select('status').eq('evento_id', evt.id);
+                  const total = ps?.length || 0;
+                  const conf  = ps?.filter(p => p.status === 'confirmed').length || 0;
+                  const pend  = ps?.filter(p => p.status === 'pending').length   || 0;
+              
+                                                        return `
+                                                              <div class="ecard" onclick="abrirEvento('${evt.id}')">
+                                                                      <div class="ecard-nome">${evt.nome_noivos}</div>
+                                                                              <div class="ecard-data">📅 ${fmtDate(evt.data_evento)} · 📍 ${evt.local_evento}</div>
+                                                                                      <div class="ecard-stats">
+                                                                                                <div class="smi"><div class="smi-n">${total}</div><div class="smi-l">Total</div></div>
+                                                                                                          <div class="smi"><div class="smi-n g">${conf}</div><div class="smi-l">Confirmados</div></div>
+                                                                                                                    <div class="smi"><div class="smi-n y">${pend}</div><div class="smi-l">Pendentes</div></div>
+                                                                                                                            </div>
+                                                                                                                                  </div>`;
+            }));
+  
+    grid.innerHTML = html.join('');
+}
+
+function abrirEvento(id) {
+    window.location.href = `evento.html?id=${id}`;
+}
+
+function abrirModal()  { document.getElementById('modal-criar').classList.add('open'); }
+function fecharModal() {
+    document.getElementById('modal-criar').classList.remove('open');
+    document.getElementById('m-err').style.display = 'none';
+}
+
+async function criarEvento() {
+    const noivos   = document.getElementById('f-noivos').value.trim();
+    const data     = document.getElementById('f-data').value;
+    const horario  = document.getElementById('f-horario').value.trim();
+    const local    = document.getElementById('f-local').value.trim();
+    const limite   = document.getElementById('f-limite').value;
+    const assessora= document.getElementById('f-assessora').value.trim();
+    const contato  = document.getElementById('f-contato').value.trim();
+    const lgn      = document.getElementById('f-login').value.trim();
+    const senha    = document.getElementById('f-senha').value.trim();
+  
+    const errEl = document.getElementById('m-err');
+    errEl.style.display = 'none';
+  
+    if (!noivos || !data || !horario || !local || !limite || !lgn || !senha) {
+          errEl.textContent = 'Preencha todos os campos obrigatórios (*).';
+          errEl.style.display = 'block'; return;
+    }
+      
+        const template = `Olá, {nome}! 💍
+        
+        Você está convidado(a) para o casamento de *{noivos}*, que acontecerá no dia *{data}* às *{horario}* no *{local}*.
+        
+        Confirme sua presença até *{dataLimite}*:
+        {link}
+        
+        _{assessora} — Assessoria de Casamentos_`;
+  
+    const { data: evt, error: e1 } = await sb.from('eventos').insert({
+          nome_noivos: noivos, data_evento: data, horario,
+          local_evento: local, data_limite: limite,
+          nome_assessora: assessora || 'Eloisa',
+          contato_assessora: contato, template_mensagem: template
+    }).select().single();
+  
+    if (e1) { errEl.textContent = 'Erro ao criar evento: ' + e1.message; errEl.style.display = 'block'; return; }
+      
+        const { error: e2 } = await sb.from('usuarios').insert({
+              nome: noivos, login: lgn, senha, papel: 'noivos', evento_id: evt.id
+        });
+  
+    if (e2) { errEl.textContent = 'Evento criado! Erro no login: ' + e2.message; errEl.style.display = 'block'; return; }
+      
+        fecharModal();
+    toast(`Evento "${noivos}" criado!`);
+    await carregarEventos();
+}
+
+function toast(msg, dur = 3500) {
+    const el = document.getElementById('toast');
+    el.textContent = msg; el.classList.add('show');
+    setTimeout(() => el.classList.remove('show'), dur);
+}
+function fmtDate(d) {
+    return d ? new Date(d+'T00:00:00').toLocaleDateString('pt-BR') : '';
+}
+
+document.addEventListener('keydown', e => { if (e.key === 'Escape') fecharModal(); });
+document.getElementById('modal-criar').addEventListener('click', e => {
+    if (e.target === document.getElementById('modal-criar')) fecharModal();
+});
+</script>
+</body>
+</html>html>
+</h3>
+  </header></label></label></span>
+</body></title>
+</head><!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>ConfirmaFest — Entrar</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+          :root {
+                  --cream:#FAF7F2; --warm:#FDF9F4; --gold:#C9A96E; --gold-l:#E8D5B0;
+                  --dark:#1A1612; --brown:#3D2B1F; --muted:#8C7B6B;
+                  --green:#4A7C59; --red:#8B3A3A; --border:#E8E0D5;
+          }
+          *{box-sizing:border-box;margin:0;padding:0;}
+          body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--dark);min-height:100vh;}
+          #pg-login{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;}
+          .login-card{background:white;border-radius:20px;padding:48px 40px;width:100%;max-width:400px;box-shadow:0 8px 40px rgba(0,0,0,.08);text-align:center;}
+          .llogo{font-family:'Cormorant Garamond',serif;font-size:28px;font-weight:300;color:var(--brown);margin-bottom:4px;}
+          .llogo span{color:var(--gold);font-style:italic;}
+          .lsub{font-size:13px;color:var(--muted);margin-bottom:36px;}
+          .lf{margin-bottom:14px;text-align:left;}
+          .lf label{display:block;font-size:12px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;}
+          .lf input{width:100%;padding:12px 16px;border:1px solid var(--border);border-radius:10px;font-family:'DM Sans',sans-serif;font-size:15px;background:var(--warm);outline:none;transition:border .2s;}
+          .lf input:focus{border-color:var(--gold);}
+          .btn-login{width:100%;padding:14px;background:var(--dark);color:var(--gold-l);border:none;border-radius:10px;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:500;cursor:pointer;transition:all .2s;margin-top:8px;}
+          .btn-login:hover{background:var(--brown);}
+          .lerr{background:#FFEBEE;color:#C62828;padding:10px 14px;border-radius:8px;font-size:13px;margin-top:12px;display:none;}
+          #pg-dash{display:none;}
+          header{background:var(--dark);padding:16px 40px;display:flex;align-items:center;justify-content:space-between;}
+          .hlogo{font-family:'Cormorant Garamond',serif;font-size:20px;font-weight:300;color:var(--gold-l);letter-spacing:2px;}
+          .hlogo span{color:var(--gold);font-style:italic;}
+          .huser{display:flex;align-items:center;gap:16px;font-size:13px;color:#888;}
+          .btn-sair{background:none;border:1px solid #444;color:#888;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:12px;font-family:'DM Sans',sans-serif;transition:all .2s;}
+          .btn-sair:hover{border-color:var(--gold);color:var(--gold-l);}
+          .dash-wrap{max-width:1100px;margin:0 auto;padding:40px 24px;}
+          .dash-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:32px;}
+          .dash-title{font-family:'Cormorant Garamond',serif;font-size:32px;font-weight:300;color:var(--brown);}
+          .btn-criar{padding:12px 24px;background:var(--gold);color:white;border:none;border-radius:10px;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:500;cursor:pointer;transition:all .2s;}
+          .btn-criar:hover{background:#B8935A;}
+          .eventos-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:20px;}
+          .ecard{background:white;border:1px solid var(--border);border-radius:16px;padding:24px;cursor:pointer;transition:all .25s;}
+          .ecard:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,.08);border-color:var(--gold-l);}
+          .ecard-nome{font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:400;color:var(--brown);margin-bottom:4px;}
+          .ecard-data{font-size:13px;color:var(--muted);margin-bottom:16px;}
+          .ecard-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
+          .smi{background:var(--cream);border-radius:8px;padding:8px;text-align:center;}
+          .smi-n{font-family:'Cormorant Garamond',serif;font-size:24px;font-weight:300;color:var(--brown);}
+          .smi-n.g{color:var(--green);} .smi-n.r{color:var(--red);} .smi-n.y{color:var(--gold);}
+          .smi-l{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;}
+          .empty{text-align:center;padding:60px 20px;color:var(--muted);}
+          .empty h3{font-family:'Cormorant Garamond',serif;font-size:24px;font-weight:300;color:var(--brown);margin-bottom:8px;}
+          .overlay{display:none;position:fixed;inset:0;background:rgba(26,22,18,.7);backdrop-filter:blur(4px);z-index:100;align-items:center;justify-content:center;padding:20px;}
+          .overlay.open{display:flex;}
+          .modal{background:white;border-radius:18px;width:100%;max-width:620px;max-height:90vh;overflow-y:auto;box-shadow:0 32px 80px rgba(0,0,0,.3);}
+          .mhead{padding:24px 28px 0;display:flex;justify-content:space-between;align-items:center;}
+          .mtitle{font-family:'Cormorant Garamond',serif;font-size:24px;font-weight:400;color:var(--brown);}
+          .mclose{background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted);}
+          .mbody{padding:20px 28px;}
+          .msec{font-size:12px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:14px;margin-top:4px;}
+          .fg{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;}
+          .ff label{display:block;font-size:12px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;}
+          .ff input{width:100%;padding:10px 14px;border:1px solid var(--border);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:14px;background:var(--warm);outline:none;transition:border .2s;}
+          .ff input:focus{border-color:var(--gold);}
+          .divider{border:none;border-top:1px solid var(--border);margin:18px 0;}
+          .mfoot{padding:14px 28px 24px;display:flex;gap:10px;justify-content:flex-end;}
+          .btn-cancel{padding:10px 20px;background:transparent;border:1px solid var(--border);border-radius:8px;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:14px;}
+          .btn-save{padding:10px 24px;background:var(--gold);color:white;border:none;border-radius:8px;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:500;}
+          .btn-save:hover{background:#B8935A;}
+          .merr{background:#FFEBEE;color:#C62828;padding:10px 16px;border-radius:8px;font-size:13px;margin:0 28px 14px;display:none;}
+          .toast{position:fixed;bottom:28px;right:28px;background:var(--dark);color:var(--gold-l);padding:12px 20px;border-radius:10px;font-size:13px;transform:translateY(60px);opacity:0;transition:all .3s;z-index:999;}
+          .toast.show{transform:translateY(0);opacity:1;}
+          @media(max-width:600px){header{padding:14px 20px;}.dash-wrap{padding:24px 16px;}.fg{grid-template-columns:1fr;}}
+        </style>
+  </head>
+  <body>
+    <div id="pg-login">
+        <div class="login-card">
+              <div class="llogo">✦ <span>ConfirmaFest</span></div>div>
+            <div class="lsub">Assessoria de Casamentos · Eloisa</div>div>
+            <div class="lf">
+                  <label>Usuário</label>
+                  <input type="text" id="l-user" placeholder="seu usuário" autocomplete="username">
+            </div>div>
+            <div class="lf">
+                  <label>Senha</label>
+                  <input type="password" id="l-pass" placeholder="········" autocomplete="current-password"
+                            onkeydown="if(event.key==='Enter')login()">
+            </div>div>
+            <button class="btn-login" onclick="login()">Entrar →</button>button>
+            <div class="lerr" id="l-err">Usuário ou senha incorretos.</div>div>
+        </div>div>
+    </div>div>
+  <div id="pg-dash">
+    <header>
+          <div class="hlogo">✦ <span>ConfirmaFest</span></div>div>
+          <div class="huser">
+                  <span id="h-nome"></span>
+                  <button class="btn-sair" onclick="sair()">Sair</button>button>
+          </div>div>
+    </header>
+      <div class="dash-wrap">
+            <div class="dash-top">
+                    <div class="dash-title">Meus Eventos</div>div>
+                    <button class="btn-criar" onclick="abrirModal()">+ Criar Evento</button>button>
+            </div>div>
+            <div class="eventos-grid" id="ev-grid">
+                    <div class="empty" style="grid-column:1/-1">
+                              <div style="font-size:40px;margin-bottom:12px">💍</div>div>
+                              <h3>Carregando...</h3>
+                    </div>div>
+            </div>div>
+      </div>div>
+  </div>div>
+  <div class="overlay" id="modal-criar">
+    <div class="modal">
+        <div class="mhead">
+              <div class="mtitle">Novo Evento</div>div>
+              <button class="mclose" onclick="fecharModal()">✕</button>button>
+        </div>div>
+        <div class="mbody">
+              <div class="msec">Dados do Casamento</div>div>
+              <div class="fg">
+                      <div class="ff" style="grid-column:1/-1">
+                                <label>Nome dos Noivos *</label>
+                                <input type="text" id="f-noivos" placeholder="Ana & João">
+                      </div>div>
+                      <div class="ff">
+                                <label>Data do Evento *</label>
+                                <input type="date" id="f-data">
+                      </div>div>
+                      <div class="ff">
+                                <label>Horário *</label>
+                                <input type="text" id="f-horario" placeholder="16h00">
+                      </div>div>
+                      <div class="ff" style="grid-column:1/-1">
+                                <label>Local *</label>
+                                <input type="text" id="f-local" placeholder="Espaço Vila dos Sonhos — Maringá, PR">
+                      </div>div>
+                      <div class="ff">
+                                <label>Data Limite para Confirmar *</label>
+                                <input type="date" id="f-limite">
+                      </div>div>
+              </div>div>
+              <hr class="divider">
+              <div class="msec">Assessoria</div>div>
+              <div class="fg">
+                      <div class="ff">
+                                <label>Nome da Assessora</label>
+                                <input type="text" id="f-assessora" value="Eloisa">
+                      </div>div>
+                      <div class="ff">
+                                <label>Contato (WhatsApp ou e-mail)</label>
+                                <input type="text" id="f-contato" placeholder="44 99999-0000">
+                      </div>div>
+              </div>div>
+              <hr class="divider">
+              <div class="msec">Acesso dos Noivos</div>div>
+              <div class="fg">
+                      <div class="ff">
+                                <label>Usuário *</label>
+                                <input type="text" id="f-login" placeholder="ana-joao-2025">
+                      </div>div>
+                      <div class="ff">
+                                <label>Senha *</label>
+                                <input type="text" id="f-senha" placeholder="defina uma senha">
+                      </div>div>
+              </div>div>
+        </div>div>
+        <div class="merr" id="m-err"></div>div>
+        <div class="mfoot">
+              <button class="btn-cancel" onclick="fecharModal()">Cancelar</button>button>
+              <button class="btn-save" onclick="criarEvento()">Criar Evento →</button>button>
+        </div>div>
+    </div>div>
+  </div>div>
+  <div class="toast" id="toast"></div>div>
+  <script>
+    const SUPABASE_URL = 'https://pmybjjftrfcjlkqikcsw.supabase.co';
+    const SUPABASE_KEY = 'sb_publishable_xc7TXXd__meeKFLB106Otg_sdEiknLY';
+    const { createClient } = supabase;
+    const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
+    let session = null;
+    window.addEventListener('load', () => {
+        session = JSON.parse(localStorage.getItem('cf_session') || 'null');
+        if (session) mostrarDash();
+    });
+    async function login() {
+        const user  = document.getElementById('l-user').value.trim();
+        const pass  = document.getElementById('l-pass').value;
+        const errEl = document.getElementById('l-err');
+        const btn   = document.querySelector('.btn-login');
+        errEl.style.display = 'none';
+        if (!user || !pass) {
+              errEl.textContent = 'Preencha usuário e senha.';
+              errEl.style.display = 'block'; return;
+        }
+        btn.textContent = 'Entrando...'; btn.disabled = true;
+        try {
+              const { data, error } = await sb
+                .from('usuarios').select('*')
+                .eq('login', user).eq('senha', pass).limit(1);
+              if (error) {
+                      errEl.textContent = 'Erro de conexão: ' + error.message;
+                      errEl.style.display = 'block'; return;
+              }
+              if (!data || data.length === 0) {
+                      errEl.textContent = 'Usuário ou senha incorretos.';
+                      errEl.style.display = 'block'; return;
+              }
+              const u = data[0];
+              session = { id: u.id, nome: u.nome, papel: u.papel, evento_id: u.evento_id };
+              localStorage.setItem('cf_session', JSON.stringify(session));
+              if (u.papel === 'noivos') {
+                      window.location.href = `evento.html?id=${u.evento_id}`;
+              } else {
+                      mostrarDash();
+              }
+        } catch(e) {
+              errEl.textContent = 'Erro inesperado: ' + e.message;
+              errEl.style.display = 'block';
+        } finally {
+              btn.textContent = 'Entrar →'; btn.disabled = false;
+        }
+    }
+    function sair() {
+        localStorage.removeItem('cf_session');
+        session = null;
+        document.getElementById('pg-dash').style.display  = 'none';
+        document.getElementById('pg-login').style.display = 'flex';
+    }
+    async function mostrarDash() {
+        document.getElementById('pg-login').style.display = 'none';
+        document.getElementById('pg-dash').style.display  = 'block';
+        document.getElementById('h-nome').textContent = session.nome;
+        await carregarEventos();
+    }
+    async function carregarEventos() {
+        const { data: evts, error } = await sb
+          .from('eventos').select('*').order('data_evento', { ascending: false });
+        const grid = document.getElementById('ev-grid');
+        if (error) { grid.innerHTML = '<div class="empty"><h3>Erro ao carregar eventos.</h3></div>'; return; }
+        if (!evts || evts.length === 0) {
+              grid.innerHTML = `
+                    <div class="empty" style="grid-column:1/-1">
+                            <div style="font-size:44px;margin-bottom:14px">💍</div>
+                                    <h3>Nenhum evento ainda</h3>
+                                            <p>Clique em "+ Criar Evento" para começar</p>
+                                                  </div>`;
+              return;
+        }
+        const html = await Promise.all(evts.map(async evt => {
+              const { data: ps } = await sb.from('pessoas').select('status').eq('evento_id', evt.id);
+              const total = ps?.length || 0;
+              const conf  = ps?.filter(p => p.status === 'confirmed').length || 0;
