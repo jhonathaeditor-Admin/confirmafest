@@ -43,7 +43,7 @@ const esc=s=>(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"
 const norm=s=>(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
 const dig=s=>(s||'').replace(/\D/g,'');
 
-let S={aba:'painel',ev:null,fams:[],busca:'',filtro:'total',loading:true,erro:'',addOpen:false,saved:false,perms:null};
+let S={aba:'painel',ev:null,fams:[],busca:'',filtro:'total',loading:true,erro:'',addOpen:false,saved:false,perms:null,disp:null};
 
 async function carregar(){
   const {data:sess}=await sb.auth.getSession();
@@ -296,15 +296,98 @@ function abaGestao(){
   return resumo+status+rsvp+perms+acoes;
 }
 
-function abaEmBreve(t){
-  return '<div class="card" style="padding:44px;text-align:center;"><p style="margin:0 0 8px;font:400 20px/1 Fraunces,serif;color:#F5D89B;">'+t+'</p><p style="margin:0;font:400 14px/1.6 Inter,sans-serif;color:#8F8271;">Esta aba será conectada na próxima etapa.</p></div>';
+// ---------- disparo ----------
+const INTERVALO=8; // segundos entre envios (anti-bloqueio)
+async function dispararTodos(){
+  const alvos=S.fams.filter(f=>f.pessoas.some(p=>p.st==='pendente'));
+  if(!alvos.length){ alert('Não há convidados pendentes para disparar.'); return; }
+  if(S.ev.status!=='ativo'||!S.ev.rsvp){ alert('O evento precisa estar ATIVO com confirmações ABERTAS. Ajuste na aba Gestão.'); return; }
+  if(!confirm('Disparar convite para '+alvos.length+' responsável(is)?\n\nIntervalo de '+INTERVALO+'s entre envios para evitar bloqueio do WhatsApp.')) return;
+  S.disp={rodando:true,pausado:false,fila:alvos.map(f=>({id:f.id,nome:f.nome,tel:f.tel,estado:'espera'})),i:0,prox:0};
+  r(); loopDisparo();
+}
+async function loopDisparo(){
+  const d=S.disp;
+  while(d.rodando && d.i<d.fila.length){
+    if(d.pausado){ await new Promise(x=>setTimeout(x,500)); continue; }
+    const item=d.fila[d.i];
+    item.estado='enviando'; d.prox=0; r();
+    try{
+      const {data,error}=await sb.functions.invoke('disparar-whatsapp',{body:{responsavel_id:item.id}});
+      if(error) throw error;
+      item.estado = (data&&data.ok) ? 'enviado' : 'falha';
+      item.erro = data&&data.erro ? data.erro : '';
+    }catch(e){ item.estado='falha'; item.erro=String(e.message||e); }
+    d.i++; r();
+    if(d.i<d.fila.length){
+      for(let s=INTERVALO;s>0;s--){ if(!d.rodando) return; if(d.pausado){ s++; } else { d.prox=s; r(); } await new Promise(x=>setTimeout(x,1000)); }
+      d.prox=0;
+    }
+  }
+  d.rodando=false; r();
+}
+function pausarDisparo(v){ if(S.disp) { S.disp.pausado=v; r(); } }
+function pararDisparo(){ if(S.disp){ S.disp.rodando=false; r(); } }
+async function reenviar(id){
+  const item=S.disp.fila.find(x=>x.id===id); if(!item) return;
+  item.estado='enviando'; r();
+  try{
+    const {data,error}=await sb.functions.invoke('disparar-whatsapp',{body:{responsavel_id:id}});
+    if(error) throw error;
+    item.estado=(data&&data.ok)?'enviado':'falha'; item.erro=data&&data.erro?data.erro:'';
+  }catch(e){ item.estado='falha'; item.erro=String(e.message||e); }
+  r();
+}
+
+function abaDisparo(){
+  const pend=S.fams.filter(f=>f.pessoas.some(p=>p.st==='pendente'));
+  const d=S.disp;
+  const online=S.ev.status==='ativo'&&S.ev.rsvp;
+  const selo='<span style="display:inline-flex;align-items:center;gap:7px;padding:7px 13px;border-radius:99px;'+(online?'border:1px solid rgba(127,194,155,.45);background:rgba(30,69,52,.3);color:#A7D9BF;':'border:1px solid rgba(197,110,92,.45);background:rgba(161,77,63,.12);color:#E0A294;')+'font:600 9px/1 Inter,sans-serif;letter-spacing:.12em;text-transform:uppercase;"><span style="width:6px;height:6px;border-radius:50%;background:'+(online?'#57A67C':'#A14D3F')+';"></span>'+(online?'Sistema online':'Evento inativo / RSVP fechado')+'</span>';
+
+  if(!d){
+    let lista='';
+    pend.forEach(f=>{ lista+='<div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid rgba(201,166,98,.08);"><span style="font:400 14px/1 Inter,sans-serif;color:#F3ECE0;">'+esc(f.nome)+'</span><span style="font:400 12px/1 Inter,sans-serif;color:#8F8271;">'+esc(f.tel)+'</span></div>'; });
+    return '<div style="margin-bottom:16px;">'+selo+'</div>'
+      +'<div class="card" style="padding:24px;"><p style="margin:0 0 4px;font:400 20px/1 Fraunces,serif;color:#F5D89B;">Disparo dos convites</p>'
+      +'<p style="margin:0 0 18px;font:400 12px/1.6 Inter,sans-serif;color:#8F8271;">Cada responsável recebe uma mensagem no WhatsApp com o link único da família. Intervalo de '+INTERVALO+'s entre envios para evitar bloqueio.</p>'
+      +(pend.length?'<p style="margin:0 0 6px;font:600 9px/1 Inter,sans-serif;letter-spacing:.16em;text-transform:uppercase;color:#C9A662;">'+pend.length+' destinatário'+(pend.length!==1?'s':'')+'</p>'+lista
+        +'<button class="btn-p" style="margin-top:20px;" onclick="dispararTodos()">Disparar '+pend.length+' convite'+(pend.length!==1?'s':'')+'</button>'
+        :'<p style="margin:0;font:400 14px/1.6 Inter,sans-serif;color:#8F8271;">Todos os convidados já responderam — não há disparos pendentes.</p>')
+      +'</div>';
+  }
+
+  const feitos=d.fila.filter(x=>x.estado==='enviado'||x.estado==='falha').length;
+  const pct=Math.round((feitos/d.fila.length)*100);
+  const falhas=d.fila.filter(x=>x.estado==='falha');
+  let linhas='';
+  d.fila.forEach(x=>{
+    const cor=x.estado==='enviado'?'#A7D9BF':x.estado==='enviando'?'#F5D89B':x.estado==='falha'?'#E0A294':'#8F8271';
+    const lb=x.estado==='enviado'?'Enviado ✓':x.estado==='enviando'?'Enviando…':x.estado==='falha'?'Falhou':'Aguardando';
+    linhas+='<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid rgba(201,166,98,.07);"><span style="font:400 14px/1 Inter,sans-serif;color:'+(x.estado==='enviado'?'#A7D9BF':'#F3ECE0')+';">'+esc(x.nome)+'</span><span style="font:600 9px/1 Inter,sans-serif;letter-spacing:.1em;text-transform:uppercase;color:'+cor+';">'+lb+'</span></div>';
+  });
+  let manual='';
+  if(falhas.length){
+    manual='<div class="card" style="padding:20px;margin-top:14px;border-color:rgba(197,110,92,.3);"><p style="margin:0 0 4px;font:400 17px/1 Fraunces,serif;color:#E0A294;">Para análise manual da assessoria</p>'
+      +'<p style="margin:0 0 14px;font:400 12px/1.5 Inter,sans-serif;color:#8F8271;">Estes envios falharam. Confira o número e tente novamente.</p>';
+    falhas.forEach(x=>{ manual+='<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid rgba(201,166,98,.07);"><span><span style="font:400 14px/1 Inter,sans-serif;color:#F3ECE0;">'+esc(x.nome)+'</span><span style="display:block;font:400 11px/1.4 Inter,sans-serif;color:#8F8271;">'+esc(x.tel)+(x.erro?' · '+esc(String(x.erro).slice(0,60)):'')+'</span></span><button class="btn" style="min-height:34px;padding:0 12px;" onclick="reenviar(\''+x.id+'\')">Tentar novamente</button></div>'; });
+    manual+='</div>';
+  }
+  return '<div style="margin-bottom:16px;">'+selo+'</div>'
+    +'<div class="card" style="padding:24px;">'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;"><p style="margin:0;font:400 20px/1 Fraunces,serif;color:#F5D89B;">'+(d.rodando?(d.pausado?'Disparo pausado':'Enviando…'):'Disparo concluído')+'</p>'
+    +'<span style="font:400 13px/1 Inter,sans-serif;color:#8F8271;">'+feitos+' de '+d.fila.length+'</span></div>'
+    +'<div style="height:6px;background:rgba(201,166,98,.12);border-radius:99px;overflow:hidden;margin-bottom:10px;"><div style="height:100%;width:'+pct+'%;background:linear-gradient(90deg,#9a7a3c,#F5D89B);transition:width .4s;"></div></div>'
+    +(d.rodando&&d.prox>0?'<p style="margin:0 0 14px;font:400 12px/1 Inter,sans-serif;color:#C9A662;">Próximo envio em '+d.prox+'s (intervalo anti-bloqueio)</p>':'<div style="height:14px;"></div>')
+    +(d.rodando?'<div style="display:flex;gap:10px;margin-bottom:16px;">'+(d.pausado?'<button class="btn" onclick="pausarDisparo(false)">Retomar</button>':'<button class="btn" onclick="pausarDisparo(true)">Pausar</button>')+'<button class="btn" style="border-color:rgba(197,110,92,.4);color:#E0A294;" onclick="pararDisparo()">Parar</button></div>':'')
+    +linhas+'</div>'+manual;
 }
 
 function view(){
   if(S.loading) return '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;color:#8F8271;">Carregando…</div>';
   if(S.erro) return '<div style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;"><p style="color:#E0A294;">'+esc(S.erro)+'</p><a class="btn" href="index.html" style="display:inline-flex;align-items:center;">← Meus eventos</a></div>';
   const abas=[['config','Configuração'],['convidados','Convidados'],['disparo','Disparo'],['painel','Painel'],['acesso','Acesso'],['gestao','Gestão']];
-  let conteudo = S.aba==='painel'?abaPainel():S.aba==='convidados'?abaConvidados():S.aba==='config'?abaConfig():S.aba==='acesso'?abaAcesso():S.aba==='gestao'?abaGestao():abaEmBreve('Disparo');
+  let conteudo = S.aba==='painel'?abaPainel():S.aba==='convidados'?abaConvidados():S.aba==='config'?abaConfig():S.aba==='acesso'?abaAcesso():S.aba==='gestao'?abaGestao():S.aba==='disparo'?abaDisparo():'';
   return '<div style="max-width:1080px;margin:0 auto;padding:22px 22px 80px;">'
     +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:26px;"><a href="index.html" style="color:#8F8271;font:600 10px/1 Inter,sans-serif;letter-spacing:.16em;text-transform:uppercase;text-decoration:none;">← Meus eventos</a>'
     +'<span style="font:600 11px/1 Inter,sans-serif;letter-spacing:.2em;text-transform:uppercase;color:#C9A662;">ConfirmaFest</span></div>'
@@ -324,6 +407,7 @@ window.toggleAdd=v=>{S.addOpen=v;r();};
 window.addConvidado=addConvidado; window.excluirFam=excluirFam; window.excluirPessoa=excluirPessoa;
 window.salvarCampo=salvarCampo; window.copiar=copiar;
 window.setStatus=setStatus; window.setRsvp=setRsvp; window.setLimite=setLimite; window.salvarPerms=salvarPerms; window.excluirEvento=excluirEvento;
+window.dispararTodos=dispararTodos; window.pausarDisparo=pausarDisparo; window.pararDisparo=pararDisparo; window.reenviar=reenviar;
 function r(){app.innerHTML=view();}
 carregar();
 </script>
