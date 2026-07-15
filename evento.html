@@ -43,7 +43,7 @@ const esc=s=>(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"
 const norm=s=>(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
 const dig=s=>(s||'').replace(/\D/g,'');
 
-let S={aba:'painel',ev:null,fams:[],busca:'',filtro:'total',loading:true,erro:'',addOpen:false,saved:false};
+let S={aba:'painel',ev:null,fams:[],busca:'',filtro:'total',loading:true,erro:'',addOpen:false,saved:false,perms:null};
 
 async function carregar(){
   const {data:sess}=await sb.auth.getSession();
@@ -60,7 +60,7 @@ async function carregar(){
       if(!map[x.responsavel_id]) map[x.responsavel_id]={id:x.responsavel_id,nome:x.resp_nome,tel:x.telefone,pessoas:[]};
       if(x.pessoa_id) map[x.responsavel_id].pessoas.push({id:x.pessoa_id,nome:x.pessoa_nome,resp:x.eh_responsavel,st:x.status_presenca,quando:x.respondido_em});
     });
-    S.fams=Object.values(map); S.loading=false; r();
+    S.fams=Object.values(map); await carregarPerms(); S.loading=false; r();
   }catch(err){ console.error(err); S.erro='Erro ao carregar o evento.'; S.loading=false; r(); }
 }
 
@@ -113,6 +113,52 @@ async function excluirPessoa(id,nome){
   catch(e){ alert('Erro ao excluir.'); }
 }
 function copiar(t){ navigator.clipboard.writeText(t); alert('Link copiado!'); }
+
+// ---------- gestão ----------
+async function setStatus(v){
+  const u={status:v};
+  if(v==='encerrado'||v==='arquivado') u.rsvp_aberto=false;
+  if(v==='ativo') u.rsvp_aberto=true;
+  try{ const {error}=await sb.from('eventos').update(u).eq('id',S.ev.id); if(error) throw error;
+    S.ev.status=v; if(u.rsvp_aberto!==undefined) S.ev.rsvp=u.rsvp_aberto; r();
+  }catch(e){ alert('Erro ao mudar o status.'); }
+}
+async function setRsvp(v){
+  try{ const {error}=await sb.from('eventos').update({rsvp_aberto:v}).eq('id',S.ev.id); if(error) throw error; S.ev.rsvp=v; r(); }
+  catch(e){ alert('Erro ao mudar as confirmações.'); }
+}
+async function setLimite(v){
+  try{ const {error}=await sb.from('eventos').update({data_limite:v||null}).eq('id',S.ev.id); if(error) throw error; S.ev.limite=v; S.saved=true; r(); setTimeout(()=>{S.saved=false;r();},2000); }
+  catch(e){ alert('Erro ao salvar a data-limite.'); }
+}
+async function carregarPerms(){
+  try{ const {data}=await sb.from('permissoes_noivos').select('*').eq('evento_id',S.ev.id).maybeSingle(); S.perms=data||null; }
+  catch(e){ S.perms=null; }
+}
+async function salvarPerms(){
+  const nome=(document.getElementById('p-nome')||{}).value||'';
+  const email=(document.getElementById('p-email')||{}).value||'';
+  const p={
+    evento_id:S.ev.id, nome:nome.trim()||null, email:email.trim()||null,
+    pode_ver_painel:!!document.getElementById('k1').checked,
+    pode_editar_detalhes:!!document.getElementById('k2').checked,
+    pode_gerenciar_convidados:!!document.getElementById('k3').checked,
+    pode_disparar:!!document.getElementById('k4').checked,
+    pode_abrir_fechar_rsvp:!!document.getElementById('k5').checked,
+    pode_ver_telefones:!!document.getElementById('k6').checked
+  };
+  try{
+    if(S.perms&&S.perms.id){ const {error}=await sb.from('permissoes_noivos').update(p).eq('id',S.perms.id); if(error) throw error; }
+    else { const {error}=await sb.from('permissoes_noivos').insert(p); if(error) throw error; }
+    await carregarPerms(); S.saved=true; r(); setTimeout(()=>{S.saved=false;r();},2000);
+  }catch(e){ console.error(e); alert('Erro ao salvar as permissões.'); }
+}
+async function excluirEvento(){
+  if(!confirm('Excluir o evento "'+S.ev.casal+'"?\n\nTODOS os convidados e confirmações serão apagados. Esta ação NÃO pode ser desfeita.')) return;
+  if(!confirm('Tem certeza absoluta? Digite mentalmente: isto é definitivo.')) return;
+  try{ const {error}=await sb.from('eventos').delete().eq('id',S.ev.id); if(error) throw error; location.href='index.html'; }
+  catch(e){ alert('Erro ao excluir o evento.'); }
+}
 
 // ---------- render ----------
 function chip(st){ return st==='confirmado'?'<span class="chip c-ok">Confirmado</span>':st==='nao_vai'?'<span class="chip c-no">Não vai</span>':'<span class="chip c-pd">Pendente</span>'; }
@@ -196,6 +242,60 @@ function abaAcesso(){
     +'<button class="btn-p" onclick="copiar(\''+link+'\')">Copiar link</button></div>';
 }
 
+function abaGestao(){
+  const c=cont(); const pct=c.total?Math.round(((c.ok+c.no)/c.total)*100):0;
+  const P=S.perms||{};
+  const box=(t,d,inner)=>'<div class="card" style="padding:22px;margin-bottom:14px;"><p style="margin:0 0 4px;font:400 19px/1.2 Fraunces,serif;color:#F5D89B;">'+t+'</p>'
+    +(d?'<p style="margin:0 0 16px;font:400 12px/1.6 Inter,sans-serif;color:#8F8271;">'+d+'</p>':'<div style="height:14px;"></div>')+inner+'</div>';
+
+  // resumo
+  const mini=(n,l,cor)=>'<div style="text-align:center;padding:12px 6px;background:rgba(10,8,7,.45);border-radius:6px;"><span style="display:block;font:400 22px/1 Fraunces,serif;color:'+cor+';">'+n+'</span><span style="display:block;font:600 8px/1.3 Inter,sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#8F8271;margin-top:5px;">'+l+'</span></div>';
+  const resumo=box('Resumo mestre','Visão geral deste evento.',
+    '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:8px;">'
+    +mini(c.total,'Convidados','#F3ECE0')+mini(c.ok,'Confirmados','#A7D9BF')+mini(c.pd,'Pendentes','#C9A662')+mini(c.no,'Não vão','#E0A294')+mini(pct+'%','Respondido','#F5D89B')
+    +'</div>');
+
+  // status
+  const sts=[['rascunho','Rascunho','Ainda em preparação — o link do convidado não responde.'],['ativo','Ativo','Confirmações abertas, disparos liberados.'],['encerrado','Encerrado','Fecha as confirmações; o link mostra "confirmações encerradas".'],['arquivado','Arquivado','Guarda o evento como histórico.']];
+  const status=box('Status do evento','O status governa o comportamento do link do convidado.',
+    '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;">'
+    +sts.map(s=>'<button class="btn" style="'+(S.ev.status===s[0]?'border-color:#C9A662;background:rgba(201,166,98,.14);color:#F5D89B;':'')+'" onclick="setStatus(\''+s[0]+'\')">'+s[1]+'</button>').join('')+'</div>'
+    +'<p style="margin:0;font:400 12px/1.6 Inter,sans-serif;color:#8F8271;">'+(sts.find(s=>s[0]===S.ev.status)||['','',''])[2]+'</p>');
+
+  // rsvp + limite
+  const rsvp=box('Confirmações (RSVP)','Abra ou feche as respostas dos convidados a qualquer momento.',
+    '<div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">'
+    +'<button class="btn" style="'+(S.ev.rsvp?'border-color:rgba(127,194,155,.5);background:rgba(30,69,52,.3);color:#A7D9BF;':'')+'" onclick="setRsvp(true)">Abertas</button>'
+    +'<button class="btn" style="'+(!S.ev.rsvp?'border-color:rgba(197,110,92,.5);background:rgba(161,77,63,.15);color:#E0A294;':'')+'" onclick="setRsvp(false)">Fechadas</button>'
+    +'<span style="font:400 12px/1 Inter,sans-serif;color:#8F8271;">'+(S.ev.rsvp?'O convidado consegue confirmar.':'O link mostra "confirmações encerradas".')+'</span></div>'
+    +'<label style="display:block;margin-bottom:6px;font:600 9px/1 Inter,sans-serif;letter-spacing:.16em;text-transform:uppercase;color:#8F8271;">Data-limite para confirmar</label>'
+    +'<input class="inp" type="date" value="'+esc(S.ev.limite||'')+'" onchange="setLimite(this.value)" style="max-width:220px;">'
+    +'<p style="margin:8px 0 0;font:400 11px/1.5 Inter,sans-serif;color:#8F8271;">Depois desta data o RSVP fecha automaticamente.</p>');
+
+  // permissões
+  const tog=(id,lb,on)=>'<label style="display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid rgba(201,166,98,.08);cursor:pointer;"><input type="checkbox" id="'+id+'" '+(on?'checked':'')+' style="width:18px;height:18px;accent-color:#C9A662;cursor:pointer;"><span style="font:400 14px/1.3 Inter,sans-serif;color:#F3ECE0;">'+lb+'</span></label>';
+  const perms=box('Acesso dos noivos','Defina o que este casal pode fazer ao entrar no sistema.',
+    '<div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px;">'
+    +'<input class="inp" id="p-nome" value="'+esc(P.nome||'')+'" placeholder="Nome do casal (ex: Helena)">'
+    +'<input class="inp" id="p-email" value="'+esc(P.email||'')+'" placeholder="E-mail de acesso dos noivos"></div>'
+    +'<p style="margin:0 0 4px;font:600 9px/1 Inter,sans-serif;letter-spacing:.16em;text-transform:uppercase;color:#C9A662;">Permissões</p>'
+    +tog('k1','Ver o painel e os números',P.pode_ver_painel!==false)
+    +tog('k2','Editar detalhes do evento',!!P.pode_editar_detalhes)
+    +tog('k3','Adicionar / excluir convidados',!!P.pode_gerenciar_convidados)
+    +tog('k4','Disparar / pausar mensagens',!!P.pode_disparar)
+    +tog('k5','Abrir / fechar confirmações',!!P.pode_abrir_fechar_rsvp)
+    +tog('k6','Ver telefones dos convidados',!!P.pode_ver_telefones)
+    +'<p style="margin:14px 0 16px;padding:11px 13px;background:rgba(201,166,98,.06);border-left:2px solid rgba(201,166,98,.35);border-radius:3px;font:400 11px/1.6 Inter,sans-serif;color:#8F8271;">Excluir o evento, trocar o WhatsApp e gerenciar acessos são <strong style="color:#C9A662;">exclusivos da assessoria</strong> — nunca liberados aos noivos.</p>'
+    +'<button class="btn-p" onclick="salvarPerms()">Salvar permissões</button>'
+    +(S.saved?'<span style="margin-left:12px;font:600 10px/1 Inter,sans-serif;letter-spacing:.1em;color:#A7D9BF;">Salvo ✓</span>':''));
+
+  // ações
+  const acoes=box('Ações do evento','Cuidado: a exclusão é definitiva.',
+    '<button class="btn" style="border-color:rgba(197,110,92,.5);color:#E0A294;" onclick="excluirEvento()">Excluir evento</button>');
+
+  return resumo+status+rsvp+perms+acoes;
+}
+
 function abaEmBreve(t){
   return '<div class="card" style="padding:44px;text-align:center;"><p style="margin:0 0 8px;font:400 20px/1 Fraunces,serif;color:#F5D89B;">'+t+'</p><p style="margin:0;font:400 14px/1.6 Inter,sans-serif;color:#8F8271;">Esta aba será conectada na próxima etapa.</p></div>';
 }
@@ -204,7 +304,7 @@ function view(){
   if(S.loading) return '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;color:#8F8271;">Carregando…</div>';
   if(S.erro) return '<div style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;"><p style="color:#E0A294;">'+esc(S.erro)+'</p><a class="btn" href="index.html" style="display:inline-flex;align-items:center;">← Meus eventos</a></div>';
   const abas=[['config','Configuração'],['convidados','Convidados'],['disparo','Disparo'],['painel','Painel'],['acesso','Acesso'],['gestao','Gestão']];
-  let conteudo = S.aba==='painel'?abaPainel():S.aba==='convidados'?abaConvidados():S.aba==='config'?abaConfig():S.aba==='acesso'?abaAcesso():abaEmBreve(S.aba==='disparo'?'Disparo':'Gestão');
+  let conteudo = S.aba==='painel'?abaPainel():S.aba==='convidados'?abaConvidados():S.aba==='config'?abaConfig():S.aba==='acesso'?abaAcesso():S.aba==='gestao'?abaGestao():abaEmBreve('Disparo');
   return '<div style="max-width:1080px;margin:0 auto;padding:22px 22px 80px;">'
     +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:26px;"><a href="index.html" style="color:#8F8271;font:600 10px/1 Inter,sans-serif;letter-spacing:.16em;text-transform:uppercase;text-decoration:none;">← Meus eventos</a>'
     +'<span style="font:600 11px/1 Inter,sans-serif;letter-spacing:.2em;text-transform:uppercase;color:#C9A662;">ConfirmaFest</span></div>'
@@ -223,6 +323,7 @@ window.limpar=()=>{S.busca='';S.filtro='total';r();};
 window.toggleAdd=v=>{S.addOpen=v;r();};
 window.addConvidado=addConvidado; window.excluirFam=excluirFam; window.excluirPessoa=excluirPessoa;
 window.salvarCampo=salvarCampo; window.copiar=copiar;
+window.setStatus=setStatus; window.setRsvp=setRsvp; window.setLimite=setLimite; window.salvarPerms=salvarPerms; window.excluirEvento=excluirEvento;
 function r(){app.innerHTML=view();}
 carregar();
 </script>
