@@ -43,13 +43,20 @@ const esc=s=>(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"
 const norm=s=>(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
 const dig=s=>(s||'').replace(/\D/g,'');
 
-let S={aba:'painel',ev:null,fams:[],busca:'',filtro:'total',loading:true,erro:'',addOpen:false,saved:false,perms:null,disp:null,intervalo:8,
+let S={papel:'assessora',perm:{},aba:'painel',ev:null,fams:[],busca:'',filtro:'total',loading:true,erro:'',addOpen:false,saved:false,criando:false,perms:null,disp:null,intervalo:8,
   cfg:{min:8,max:25,lote:20,pausaMin:15,ritmo:'seguro'}};
 
 async function carregar(){
   const {data:sess}=await sb.auth.getSession();
   if(!sess.session){ location.href='index.html'; return; }
   try{
+    // descobre o papel: se o login for de noivos, carrega as permissões
+    const {data:nv}=await sb.rpc('meu_evento_noivos');
+    if(nv&&nv.length){
+      S.papel='noivos';
+      S.perm={painel:nv[0].ver_painel,detalhes:nv[0].editar_detalhes,convidados:nv[0].gerenciar_convidados,
+              disparar:nv[0].disparar,rsvp:nv[0].abrir_fechar_rsvp,telefones:nv[0].ver_telefones};
+    }
     const {data,error}=await sb.rpc('evento_detalhe',{p_slug:SLUG});
     if(error) throw error;
     if(!data||!data.length){ S.erro='Evento não encontrado.'; S.loading=false; r(); return; }
@@ -159,9 +166,9 @@ async function carregarPerms(){
 }
 async function salvarPerms(){
   const nome=(document.getElementById('p-nome')||{}).value||'';
-  const email=(document.getElementById('p-email')||{}).value||'';
+  const email=((document.getElementById('p-user')||{}).value||'').trim().toLowerCase();
   const p={
-    evento_id:S.ev.id, nome:nome.trim()||null, email:email.trim()||null,
+    evento_id:S.ev.id, nome:nome.trim()||null, email:email||null,
     pode_ver_painel:!!document.getElementById('k1').checked,
     pode_editar_detalhes:!!document.getElementById('k2').checked,
     pode_gerenciar_convidados:!!document.getElementById('k3').checked,
@@ -196,15 +203,15 @@ function listaHTML(){
     h+='<div class="card" style="padding:18px;margin-bottom:12px;">'
       +'<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid rgba(201,166,98,.12);">'
       +'<div><p style="margin:0;font:400 18px/1.3 Fraunces,serif;color:#F5D89B;">'+esc(f.nome)+'</p>'
-      +'<p style="margin:3px 0 0;font:400 12px/1 Inter,sans-serif;color:#8F8271;">'+esc(f.tel)+' · '+f.pessoas.length+' pessoa'+(f.pessoas.length!==1?'s':'')+'</p></div>'
-      +'<button class="btn" style="border-color:rgba(197,110,92,.4);color:#E0A294;min-height:36px;padding:0 12px;" onclick="excluirFam(\''+f.id+'\',\''+esc(f.nome).replace(/'/g,"")+'\')">Excluir</button></div>';
+      +'<p style="margin:3px 0 0;font:400 12px/1 Inter,sans-serif;color:#8F8271;">'+(S.papel==='noivos'&&!S.perm.telefones?'(••) •••••-••••':esc(f.tel))+' · '+f.pessoas.length+' pessoa'+(f.pessoas.length!==1?'s':'')+'</p></div>'
+      +((S.papel==='noivos'&&!S.perm.convidados)?'':'<button class="btn" style="border-color:rgba(197,110,92,.4);color:#E0A294;min-height:36px;padding:0 12px;" onclick="excluirFam(\''+f.id+'\',\''+esc(f.nome).replace(/'/g,"")+'\')">Excluir</button>')+'</div>';
     if(!f.pessoas.length){ h+='<p style="margin:0;padding:10px 12px;background:rgba(161,77,63,.1);border-left:2px solid #A14D3F;border-radius:3px;font:400 12px/1.5 Inter,sans-serif;color:#E0A294;">Sem pessoas cadastradas. Exclua para liberar o telefone '+esc(f.tel)+'.</p>'; }
     f.pessoas.forEach(p=>{
       h+='<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 0;'+(p.resp?'':'padding-left:16px;border-left:2px solid rgba(201,166,98,.2);margin-left:2px;')+'">'
         +'<div><span style="font:500 15px/1.3 Inter,sans-serif;color:#F3ECE0;">'+esc(p.nome)+'</span>'
         +'<span style="display:block;font:600 9px/1.3 Inter,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:'+(p.resp?'#C9A662':'#8F8271')+';margin-top:2px;">'+(p.resp?'Responsável':'Dependente')+'</span></div>'
         +'<div style="display:flex;align-items:center;gap:8px;">'+chip(p.st)
-        +'<button class="btn" style="border-color:rgba(197,110,92,.3);color:rgba(224,162,148,.8);min-height:32px;padding:0 9px;font-size:9px;" onclick="excluirPessoa(\''+p.id+'\',\''+esc(p.nome).replace(/'/g,"")+'\')">×</button></div></div>';
+        +((S.papel==='noivos'&&!S.perm.convidados)?'':'<button class="btn" style="border-color:rgba(197,110,92,.3);color:rgba(224,162,148,.8);min-height:32px;padding:0 9px;font-size:9px;" onclick="excluirPessoa(\''+p.id+'\',\''+esc(p.nome).replace(/'/g,"")+'\')">×</button>')+'</div></div>';
     });
     h+='</div>';
   });
@@ -239,7 +246,8 @@ function abaConvidados(){
     +'<input class="inp" id="a-tel" placeholder="WhatsApp com DDD (ex: 5521996140032)">'
     +'<input class="inp" id="a-deps" placeholder="Dependentes separados por vírgula (opcional)">'
     +'<div style="display:flex;gap:10px;margin-top:4px;"><button class="btn-p" onclick="addConvidado()">Salvar</button><button class="btn" onclick="toggleAdd(false)">Cancelar</button></div></div></div>':'';
-  return '<div style="display:flex;justify-content:flex-end;margin-bottom:14px;">'+(S.addOpen?'':'<button class="btn-p" onclick="toggleAdd(true)">+ Adicionar convidado</button>')+'</div>'
+  const podeAdd = S.papel!=='noivos' || S.perm.convidados;
+  return '<div style="display:flex;justify-content:flex-end;margin-bottom:14px;">'+((S.addOpen||!podeAdd)?'':'<button class="btn-p" onclick="toggleAdd(true)">+ Adicionar convidado</button>')+'</div>'
     +add+kpisHTML()+buscaHTML()+listaHTML();
 }
 
@@ -304,7 +312,12 @@ function abaGestao(){
   const perms=box('Acesso dos noivos','Defina o que este casal pode fazer ao entrar no sistema.',
     '<div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px;">'
     +'<input class="inp" id="p-nome" value="'+esc(P.nome||'')+'" placeholder="Nome do casal (ex: Helena)">'
-    +'<input class="inp" id="p-email" value="'+esc(P.email||'')+'" placeholder="E-mail de acesso dos noivos"></div>'
+    +'<input class="inp" id="p-user" value="'+esc(P.email||'')+'" placeholder="Usuário de acesso (ex: helena-rafael)" autocapitalize="none" spellcheck="false">'
+    +'<input class="inp" id="p-senha" type="text" placeholder="'+(P.auth_user_id?'Nova senha (deixe vazio para manter)':'Senha de acesso (mín. 6 caracteres)')+'" autocapitalize="none" spellcheck="false">'
+    +'<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">'
+    +'<button class="btn-p" onclick="criarAcessoNoivos()" '+(S.criando?'disabled':'')+'>'+(S.criando?'Criando…':(P.auth_user_id?'Atualizar acesso':'Criar acesso dos noivos'))+'</button>'
+    +(P.auth_user_id?'<span style="display:inline-flex;align-items:center;gap:6px;font:600 9px/1 Inter,sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#A7D9BF;"><span style="width:6px;height:6px;border-radius:50%;background:#57A67C;"></span>Acesso ativo</span>':'<span style="font:400 11px/1.4 Inter,sans-serif;color:#8F8271;">Ainda sem acesso criado.</span>')
+    +'</div></div>'
     +'<p style="margin:0 0 4px;font:600 9px/1 Inter,sans-serif;letter-spacing:.16em;text-transform:uppercase;color:#C9A662;">Permissões</p>'
     +tog('k1','Ver o painel e os números',P.pode_ver_painel!==false)
     +tog('k2','Editar detalhes do evento',!!P.pode_editar_detalhes)
@@ -476,17 +489,31 @@ function abaDisparo(){
 function view(){
   if(S.loading) return '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;color:#8F8271;">Carregando…</div>';
   if(S.erro) return '<div style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;"><p style="color:#E0A294;">'+esc(S.erro)+'</p><a class="btn" href="index.html" style="display:inline-flex;align-items:center;">← Meus eventos</a></div>';
-  const abas=[['config','Configuração'],['convidados','Convidados'],['disparo','Disparo'],['painel','Painel'],['acesso','Acesso'],['gestao','Gestão']];
+  let abas=[['config','Configuração'],['convidados','Convidados'],['disparo','Disparo'],['painel','Painel'],['acesso','Acesso'],['gestao','Gestão']];
+  if(S.papel==='noivos'){
+    abas=[]; 
+    if(S.perm.detalhes) abas.push(['config','Configuração']);
+    if(S.perm.convidados||S.perm.painel) abas.push(['convidados','Convidados']);
+    if(S.perm.disparar) abas.push(['disparo','Disparo']);
+    if(S.perm.painel) abas.push(['painel','Painel']);
+    abas.push(['acesso','Acesso']);
+    if(!abas.some(a=>a[0]===S.aba)) S.aba=(abas[0]||['acesso'])[0];
+  }
   let conteudo = S.aba==='painel'?abaPainel():S.aba==='convidados'?abaConvidados():S.aba==='config'?abaConfig():S.aba==='acesso'?abaAcesso():S.aba==='gestao'?abaGestao():S.aba==='disparo'?abaDisparo():'';
   return '<div style="max-width:1080px;margin:0 auto;padding:22px 22px 80px;">'
-    +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:26px;"><a href="index.html" style="color:#8F8271;font:600 10px/1 Inter,sans-serif;letter-spacing:.16em;text-transform:uppercase;text-decoration:none;">← Meus eventos</a>'
+    +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:26px;">'
+    +(S.papel==='noivos'
+      ? '<span style="display:inline-flex;align-items:center;gap:7px;padding:6px 12px;border-radius:99px;border:1px solid rgba(201,166,98,.35);background:rgba(201,166,98,.08);font:600 9px/1 Inter,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:#C9A662;">Acesso dos noivos</span>'
+      : '<a href="index.html" style="color:#8F8271;font:600 10px/1 Inter,sans-serif;letter-spacing:.16em;text-transform:uppercase;text-decoration:none;">← Meus eventos</a>')
     +'<span style="font:600 11px/1 Inter,sans-serif;letter-spacing:.2em;text-transform:uppercase;color:#C9A662;">ConfirmaFest</span></div>'
     +'<p style="margin:0 0 4px;font:600 9px/1 Inter,sans-serif;letter-spacing:.22em;text-transform:uppercase;color:#8F8271;">Casamento · '+fmtD(S.ev.data)+'</p>'
     +'<h1 style="margin:0 0 4px;font:400 clamp(30px,7vw,44px)/1.1 Fraunces,serif;'+gold+'">'+esc(S.ev.casal)+'</h1>'
     +'<p style="margin:0 0 24px;font:400 13px/1.5 Inter,sans-serif;color:#8F8271;">'+esc(S.ev.local||'')+(S.ev.hora?' · '+S.ev.hora.slice(0,5):'')+' · <span style="color:#C9A662;">'+faltam(S.ev.data)+'</span></p>'
     +'<div style="display:flex;gap:22px;overflow-x:auto;border-bottom:1px solid rgba(201,166,98,.12);margin-bottom:26px;">'
     +abas.map(a=>'<button class="tab '+(S.aba===a[0]?'on':'')+'" onclick="setAba(\''+a[0]+'\')">'+a[1]+'</button>').join('')+'</div>'
-    +conteudo+'</div>';
+    +conteudo
+    +(S.papel==='noivos'?'<div style="margin-top:40px;text-align:center;"><button class="btn" onclick="sairNoivos()">Sair</button></div>':'')
+    +'</div>';
 }
 
 window.setAba=a=>{S.aba=a;r();};
@@ -496,6 +523,7 @@ window.limpar=()=>{S.busca='';S.filtro='total';r();};
 window.toggleAdd=v=>{S.addOpen=v;r();};
 window.addConvidado=addConvidado; window.excluirFam=excluirFam; window.excluirPessoa=excluirPessoa;
 window.salvarCampo=salvarCampo; window.copiar=copiar;
+window.sairNoivos=async function(){ await sb.auth.signOut(); location.href='index.html'; };
 window.inserirTag=function(tag){
   const t=document.getElementById('c-msg'); if(!t) return;
   const i=t.selectionStart||t.value.length;
@@ -512,7 +540,27 @@ window.msgPadrao=function(){
   if(!confirm('Substituir a mensagem atual pelo texto padrão?')) return;
   S.ev.msg=msg; salvarCampo('mensagem_convite',msg); r();
 };
-window.setStatus=setStatus; window.setRsvp=setRsvp; window.setLimite=setLimite; window.salvarPerms=salvarPerms; window.excluirEvento=excluirEvento;
+window.setStatus=setStatus; window.setRsvp=setRsvp; window.setLimite=setLimite; window.criarAcessoNoivos=async function(){
+  const nome=(document.getElementById('p-nome')||{}).value||'';
+  const user=((document.getElementById('p-user')||{}).value||'').trim().toLowerCase();
+  const senha=(document.getElementById('p-senha')||{}).value||'';
+  if(!user){ alert('Informe o usuário de acesso dos noivos.'); return; }
+  if(!/^[a-z0-9._-]{3,40}$/.test(user)){ alert('Usuário inválido.\n\nUse de 3 a 40 caracteres: letras, números, ponto, hífen ou underline.\nSem espaços e sem acentos.\n\nExemplo: helena-rafael'); return; }
+  const jaTem = S.perms && S.perms.auth_user_id;
+  if(!senha && !jaTem){ alert('Defina uma senha de acesso (mínimo 6 caracteres).'); return; }
+  if(senha && senha.length<6){ alert('A senha precisa ter ao menos 6 caracteres.'); return; }
+  if(!senha && jaTem){ alert('Deixe a senha vazia apenas se quiser manter a atual. Para só mudar permissões, use "Salvar permissões".'); return; }
+  S.criando=true; r();
+  try{
+    const {data,error}=await sb.functions.invoke('criar-acesso-noivos',{body:{evento_id:S.ev.id,usuario:user,senha:senha,nome:nome.trim()||null}});
+    if(error) throw error;
+    if(!data||!data.ok) throw new Error(data&&data.erro?data.erro:'falha');
+    S.criando=false;
+    await carregarPerms(); await salvarPerms();
+    alert('Acesso dos noivos criado!\n\nUsuário: '+user+'\nSenha: '+senha+'\n\nAnote e envie para o casal. Eles entram por "Sou noivo" na tela inicial.');
+  }catch(e){ S.criando=false; r(); alert('Erro ao criar acesso: '+(e.message||e)); }
+};
+window.salvarPerms=salvarPerms; window.excluirEvento=excluirEvento;
 window.setRitmo=function(k){
   const P={lento:{min:20,max:45,lote:15,pausaMin:20},seguro:{min:8,max:25,lote:20,pausaMin:15},rapido:{min:4,max:10,lote:30,pausaMin:8}};
   S.cfg=Object.assign({},P[k],{ritmo:k}); r();
