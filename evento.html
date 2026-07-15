@@ -77,8 +77,8 @@ function famsFiltradas(){
       const famBate=norm(f.nome).includes(q)||(qd&&dig(f.tel).includes(qd));
       if(!famBate) ps=ps.filter(p=>norm(p.nome).includes(q)||norm(({confirmado:'confirmado',pendente:'pendente',nao_vai:'nao vai'})[p.st]).includes(q));
     }
-    return {...f,pessoas:ps};
-  }).filter(f=>f.pessoas.length>0);
+    return {...f,pessoas:ps,vazia:f.pessoas.length===0};
+  }).filter(f=>f.pessoas.length>0||f.vazia);
 }
 
 // ---------- ações ----------
@@ -94,6 +94,11 @@ async function addConvidado(){
   const deps=((document.getElementById('a-deps')||{}).value||'').split(',').map(s=>s.trim()).filter(Boolean);
   if(!nome.trim()||!dig(tel)){ alert('Preencha nome e WhatsApp.'); return; }
   try{
+    // se existir um responsável órfão (sem pessoas) com este telefone, remove antes
+    const {data:orf}=await sb.from('responsaveis').select('id,pessoas(id)').eq('evento_id',S.ev.id).eq('telefone',dig(tel));
+    if(orf&&orf.length){
+      for(const o of orf){ if(!o.pessoas||o.pessoas.length===0){ await sb.from('responsaveis').delete().eq('id',o.id); } }
+    }
     const {data:rr,error:e1}=await sb.from('responsaveis').insert({evento_id:S.ev.id,nome:nome.trim(),telefone:dig(tel)}).select().single();
     if(e1) throw e1;
     const rows=[{responsavel_id:rr.id,nome:nome.trim(),eh_responsavel:true,status_presenca:'pendente'}]
@@ -101,7 +106,12 @@ async function addConvidado(){
     const {error:e2}=await sb.from('pessoas').insert(rows);
     if(e2) throw e2;
     S.addOpen=false; await carregar();
-  }catch(e){ console.error(e); alert('Erro ao adicionar. O telefone já pode existir neste evento.'); }
+  }catch(e){ console.error(e);
+    const m=String(e.message||e);
+    alert(m.includes('duplicate')||m.includes('unique')
+      ? 'Este telefone já está cadastrado neste evento. Procure por ele na lista.'
+      : 'Erro ao adicionar: '+m);
+  }
 }
 async function excluirFam(id,nome){
   if(!confirm('Excluir '+nome+' e seus dependentes? Esta ação não pode ser desfeita.')) return;
@@ -109,10 +119,21 @@ async function excluirFam(id,nome){
   catch(e){ alert('Erro ao excluir.'); }
 }
 async function excluirPessoa(id,nome){
-  if(!confirm('Excluir '+nome+'?')) return;
-  try{ const {error}=await sb.from('pessoas').delete().eq('id',id); if(error) throw error; await carregar(); }
-  catch(e){ alert('Erro ao excluir.'); }
+  // descobre a família dessa pessoa
+  const fam=S.fams.find(f=>f.pessoas.some(p=>p.id===id));
+  const ultima = fam && fam.pessoas.length===1;
+  const msg = ultima
+    ? 'Excluir '+nome+'?\n\nComo é a última pessoa desta família, o responsável e o telefone também serão removidos.'
+    : 'Excluir '+nome+'?';
+  if(!confirm(msg)) return;
+  try{
+    const {error}=await sb.from('pessoas').delete().eq('id',id);
+    if(error) throw error;
+    if(ultima && fam){ await sb.from('responsaveis').delete().eq('id',fam.id); }
+    await carregar();
+  }catch(e){ console.error(e); alert('Erro ao excluir: '+(e.message||e)); }
 }
+
 function copiar(t){ navigator.clipboard.writeText(t); alert('Link copiado!'); }
 
 // ---------- gestão ----------
@@ -177,6 +198,7 @@ function listaHTML(){
       +'<div><p style="margin:0;font:400 18px/1.3 Fraunces,serif;color:#F5D89B;">'+esc(f.nome)+'</p>'
       +'<p style="margin:3px 0 0;font:400 12px/1 Inter,sans-serif;color:#8F8271;">'+esc(f.tel)+' · '+f.pessoas.length+' pessoa'+(f.pessoas.length!==1?'s':'')+'</p></div>'
       +'<button class="btn" style="border-color:rgba(197,110,92,.4);color:#E0A294;min-height:36px;padding:0 12px;" onclick="excluirFam(\''+f.id+'\',\''+esc(f.nome).replace(/'/g,"")+'\')">Excluir</button></div>';
+    if(!f.pessoas.length){ h+='<p style="margin:0;padding:10px 12px;background:rgba(161,77,63,.1);border-left:2px solid #A14D3F;border-radius:3px;font:400 12px/1.5 Inter,sans-serif;color:#E0A294;">Sem pessoas cadastradas. Exclua para liberar o telefone '+esc(f.tel)+'.</p>'; }
     f.pessoas.forEach(p=>{
       h+='<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 0;'+(p.resp?'':'padding-left:16px;border-left:2px solid rgba(201,166,98,.2);margin-left:2px;')+'">'
         +'<div><span style="font:500 15px/1.3 Inter,sans-serif;color:#F3ECE0;">'+esc(p.nome)+'</span>'
