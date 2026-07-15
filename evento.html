@@ -253,8 +253,12 @@ function abaConfig(){
     +f('Local','c-local',S.ev.local,'Casa das Pedras — Itaipava, RJ')
     +(S.saved?'<p style="margin:6px 0 0;font:600 10px/1 Inter,sans-serif;letter-spacing:.1em;color:#A7D9BF;">Salvo ✓</p>':'')+'</div>'
     +'<div class="card" style="padding:22px;"><p style="margin:0 0 6px;font:400 20px/1 Fraunces,serif;color:#F5D89B;">Mensagem do convite</p>'
-    +'<p style="margin:0 0 14px;font:400 12px/1.5 Inter,sans-serif;color:#8F8271;">Use {nome} e {link} — cada responsável recebe o próprio nome e um link único.</p>'
-    +'<textarea class="inp" id="c-msg" rows="7" onchange="salvarCampo(\'mensagem_convite\',this.value)" placeholder="Olá, {nome}! ...">'+esc(S.ev.msg||'')+'</textarea></div></div>';
+    +'<p style="margin:0 0 12px;font:400 12px/1.5 Inter,sans-serif;color:#8F8271;">O sistema preenche sozinho: <button onclick="inserirTag(\'{nome}\')" style="background:rgba(201,166,98,.15);border:1px solid rgba(201,166,98,.4);border-radius:3px;padding:2px 7px;color:#F5D89B;font:600 11px/1.4 Inter,monospace;cursor:pointer;">{nome}</button> vira o primeiro nome do responsável · <button onclick="inserirTag(\'{link}\')" style="background:rgba(201,166,98,.15);border:1px solid rgba(201,166,98,.4);border-radius:3px;padding:2px 7px;color:#F5D89B;font:600 11px/1.4 Inter,monospace;cursor:pointer;">{link}</button> vira o link único da família. Clique para inserir.</p>'
+    +'<textarea class="inp" id="c-msg" rows="9" onchange="salvarCampo(\'mensagem_convite\',this.value)" placeholder="Olá, {nome}! ...">'+esc(S.ev.msg||'')+'</textarea>'
+    +'<div style="display:flex;align-items:center;gap:10px;margin-top:10px;flex-wrap:wrap;">'
+    +'<button class="btn" style="min-height:36px;padding:0 12px;" onclick="msgPadrao()">Restaurar mensagem padrão</button>'
+    +(S.ev.msg&&!S.ev.msg.includes('{link}')?'<span style="font:400 11px/1.4 Inter,sans-serif;color:#E0A294;">Atenção: sem {link} o convidado não recebe o link de confirmação.</span>':'')
+    +'</div></div></div>';
 }
 
 function abaAcesso(){
@@ -492,6 +496,22 @@ window.limpar=()=>{S.busca='';S.filtro='total';r();};
 window.toggleAdd=v=>{S.addOpen=v;r();};
 window.addConvidado=addConvidado; window.excluirFam=excluirFam; window.excluirPessoa=excluirPessoa;
 window.salvarCampo=salvarCampo; window.copiar=copiar;
+window.inserirTag=function(tag){
+  const t=document.getElementById('c-msg'); if(!t) return;
+  const i=t.selectionStart||t.value.length;
+  t.value=t.value.slice(0,i)+tag+t.value.slice(t.selectionEnd||i);
+  t.focus(); t.setSelectionRange(i+tag.length,i+tag.length);
+  S.ev.msg=t.value; salvarCampo('mensagem_convite',t.value);
+};
+window.msgPadrao=function(){
+  const ev=S.ev;
+  const d=ev.data?ev.data.split('-').reverse().join('/'):'';
+  const hr=ev.hora?ev.hora.slice(0,5).replace(':','h'):'';
+  let quando=''; if(d){ quando='Será no dia '+d+(hr?', às '+hr:'')+(ev.local?', em '+ev.local:'')+'.\n\n'; }
+  const msg='Olá, {nome}! Tudo bem?\n\nVocê e sua família estão convidados para o casamento de '+(ev.casal||'')+'.\n\n'+quando+'Para nos ajudar na organização, confirme a presença de cada pessoa da sua família neste link:\n{link}\n\nÉ rápido e leva menos de 1 minuto. Contamos com vocês!';
+  if(!confirm('Substituir a mensagem atual pelo texto padrão?')) return;
+  S.ev.msg=msg; salvarCampo('mensagem_convite',msg); r();
+};
 window.setStatus=setStatus; window.setRsvp=setRsvp; window.setLimite=setLimite; window.salvarPerms=salvarPerms; window.excluirEvento=excluirEvento;
 window.setRitmo=function(k){
   const P={lento:{min:20,max:45,lote:15,pausaMin:20},seguro:{min:8,max:25,lote:20,pausaMin:15},rapido:{min:4,max:10,lote:30,pausaMin:8}};
