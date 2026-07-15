@@ -21,6 +21,11 @@
   @keyframes cfFadeIn{from{opacity:0}to{opacity:1}}
   @keyframes cfFlash{0%{opacity:.85}100%{opacity:0}}
   @keyframes cfSpin{to{transform:rotate(360deg)}}
+  @keyframes cfSeal{0%{transform:scale(1.9) rotate(-10deg);opacity:0}55%{transform:scale(.94) rotate(1deg);opacity:1}78%{transform:scale(1.04)}100%{transform:scale(1);opacity:1}}
+  .cf-divider{display:flex;align-items:center;justify-content:center;gap:12px;}
+  .cf-divider span.l{display:block;width:52px;height:1px;background:linear-gradient(90deg,rgba(201,166,98,0),rgba(201,166,98,.5));}
+  .cf-divider span.d{display:block;width:5px;height:5px;background:#C9A662;transform:rotate(45deg);}
+  .cf-divider span.r{display:block;width:52px;height:1px;background:linear-gradient(90deg,rgba(201,166,98,.5),rgba(201,166,98,0));}
   @keyframes cfEmberA{0%{transform:translate(0,0) scale(1);opacity:0}10%{opacity:.85}100%{transform:translate(28px,-58vh) scale(.3);opacity:0}}
   @keyframes cfEmberB{0%{transform:translate(0,0) scale(1);opacity:0}10%{opacity:.7}100%{transform:translate(-34px,-52vh) scale(.35);opacity:0}}
   @keyframes cfEmberC{0%{transform:translate(0,0) scale(1);opacity:0}12%{opacity:.9}100%{transform:translate(8px,-64vh) scale(.25);opacity:0}}
@@ -45,7 +50,7 @@ const SUPABASE_KEY = 'sb_publishable_OzsFX2OvynXqeVLkLcPCgA_P3t8Ej0v';
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const app = document.getElementById('app');
-let state = { screen:'login', mode:'choice', loading:false, error:'', events:[], nome:'Eloisa', createOpen:false };
+let state = { boasVindas:false, screen:'login', mode:'choice', loading:false, error:'', events:[], nome:'Eloisa', createOpen:false };
 
 const goldText='background:linear-gradient(100deg,#C9A662,#F5D89B 55%,#C9A662);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:#C9A662;';
 const esc=s=>(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -68,7 +73,7 @@ async function doLogin(email, senha){
   state.loading=true; state.error=''; render();
   try{
     const { error } = await sb.auth.signInWithPassword({ email:email.trim(), password:senha });
-    if(error){ state.loading=false; state.error='E-mail ou senha incorretos.'; render(); return; }
+    if(error){ state.loading=false; state.error='Usuário ou senha incorretos.'; render(); return; }
     await carregarDashboard();
   }catch(e){ state.loading=false; state.error='Não foi possível entrar agora. Tente novamente.'; render(); }
 }
@@ -76,6 +81,11 @@ async function doLogin(email, senha){
 async function carregarDashboard(){
   state.loading=true; render();
   try{
+    // primeira vez? mostra a mensagem de boas-vindas
+    try{
+      const {data:me}=await sb.from('assessoras').select('id,nome,boas_vindas_em').maybeSingle();
+      if(me){ state.nome=me.nome||state.nome; if(!me.boas_vindas_em){ state.boasVindas=true; state.meuId=me.id; } }
+    }catch(_){}
     const { data, error } = await sb.rpc('meus_eventos');
     if(error) throw error;
     state.events = (data||[]).map(e=>({
@@ -92,7 +102,7 @@ async function logout(){ await sb.auth.signOut(); state.screen='login'; state.mo
 
 // ---------- telas ----------
 function view(){
-  if(state.screen==='dashboard') return telaDashboard();
+  if(state.screen==='dashboard') return telaDashboard()+(state.boasVindas?modalBoasVindas():'');
   return telaLogin();
 }
 
@@ -121,7 +131,7 @@ function telaLogin(){
   } else if(state.mode==='assessora'){
     inner = '<p style="margin:0 0 4px;font:600 11px/1 Inter,sans-serif;letter-spacing:.24em;text-transform:uppercase;color:#C9A662;">Acesso da assessoria</p>'
       + '<div style="width:100%;display:flex;flex-direction:column;gap:14px;text-align:left;margin-top:16px;">'
-      + '<input id="l-email" class="cf-input" type="email" placeholder="Seu e-mail" autocomplete="username">'
+      + '<input id="l-user" class="cf-input" type="text" placeholder="Seu usuário" autocomplete="username" autocapitalize="none" spellcheck="false">'
       + '<input id="l-senha" class="cf-input" type="password" placeholder="Sua senha" autocomplete="current-password">'
       + (state.error?'<p role="alert" style="margin:0;padding:12px 14px;border:1px solid rgba(197,110,92,.45);border-left:2px solid #A14D3F;border-radius:3px;background:rgba(161,77,63,.12);color:#E0A294;font:400 13px/1.5 Inter,sans-serif;">'+esc(state.error)+'</p>':'')
       + '<button class="cf-primary" onclick="onLogin()" '+(state.loading?'disabled':'')+'>'+(state.loading?'<span aria-hidden="true" style="display:inline-block;width:14px;height:14px;border:2px solid rgba(25,16,7,.3);border-top-color:#191007;border-radius:50%;animation:cfSpin .7s linear infinite;"></span>':'Entrar')+'</button>'
@@ -150,6 +160,29 @@ function telaLogin(){
     + '<div style="margin-bottom:34px;">'+wordmark()
     + '<p style="margin:14px 0 0;font:400 11px/1.6 Inter,sans-serif;letter-spacing:.18em;text-transform:uppercase;color:#8F8271;animation:cfFadeIn 1s ease 1.4s both;">Confirmações à altura do seu evento</p></div>'
     + '<div style="animation:cfFadeUp .8s cubic-bezier(.22,1,.36,1) 1.5s both;">'+inner+'</div>'
+    + '</div></div>';
+}
+
+
+function modalBoasVindas(){
+  // ————————————————————————————————————————————————
+  // MENSAGEM PARA A ELOISA — aparece uma única vez.
+  // ————————————————————————————————————————————————
+  const selo = '<div style="position:relative;width:100px;height:100px;margin:0 auto 24px;border-radius:50%;background:radial-gradient(circle at 36% 30%,#B0574A 0%,#A14D3F 38%,#6E2E27 78%,#5E2A22 100%);box-shadow:inset 0 2px 6px rgba(255,213,196,.28),inset 0 -6px 14px rgba(30,8,5,.6),0 18px 44px rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;animation:cfSeal 1s cubic-bezier(.34,1.4,.64,1) .25s both;">'
+    + '<span aria-hidden="true" style="position:absolute;inset:10px;border-radius:50%;border:1px solid rgba(243,230,207,.32);"></span>'
+    + '<span style="font:400 24px/1 Fraunces,serif;letter-spacing:.06em;color:#F3E6CF;">J&amp;E</span></div>';
+
+  return '<div style="position:fixed;inset:0;z-index:200;background:rgba(10,8,7,.96);backdrop-filter:blur(8px);display:flex;align-items:flex-start;justify-content:center;padding:32px 20px;overflow-y:auto;animation:cfFadeIn .8s ease both;">'
+    + '<div style="max-width:620px;width:100%;margin:auto;padding:46px 34px 40px;background:linear-gradient(180deg,#1B150E 0%,#17120D 100%);border:1px solid rgba(201,166,98,.28);border-radius:10px;box-shadow:inset 0 1px 0 rgba(245,216,155,.08),0 40px 110px rgba(0,0,0,.75);animation:cfFadeUp 1s cubic-bezier(.22,1,.36,1) .2s both;">'
+    + selo
+    + '<p style="margin:0 0 22px;text-align:center;font:600 9px/1.6 Inter,sans-serif;letter-spacing:.3em;text-transform:uppercase;color:#8F8271;">Esta mensagem aparece uma única vez</p>'
+    + '<h2 style="margin:0 0 28px;text-align:center;font:400 clamp(30px,7vw,38px)/1.2 Fraunces,serif;color:#F5D89B;">Meu amor,</h2>'
+    + '<div style="font:400 15px/1.9 Inter,sans-serif;color:rgba(243,236,224,.88);"><p style="margin:0 0 18px;">Existe um motivo para você estar lendo isso agora.</p><p style="margin:0 0 18px;">Entre centenas de linhas de código, eu escondi esta mensagem para que ela aparecesse apenas uma vez. Quando você fechar esta janela, ela nunca mais vai voltar. Daqui para frente, este site continuará evoluindo, recebendo novas funcionalidades, melhorias e acompanhando o seu crescimento. Mas este momento será único, assim como o motivo pelo qual tudo isso foi criado.</p><p style="margin:0 0 18px;">Talvez seja a parte mais importante de todo o código.</p><p style="margin:0 0 18px;">Algumas coisas na vida são feitas para durar apenas um momento. Outras são escolhas que fazemos todos os dias. Esta mensagem pertence à primeira delas. O meu apoio a você, à segunda.</p><p style="margin:0 0 18px;">Foram muitas horas dedicadas para fazer isso acontecer. Horas estudando, aprendendo, testando, errando, corrigindo e pensando em cada detalhe. Mas, no fim das contas, nenhuma dessas horas foi investida apenas em um site. Elas foram investidas em um sonho que não é apenas seu, mas que eu também escolhi admirar, apoiar e celebrar todos os dias.</p><p style="margin:0 0 18px;">Existe uma frase que diz que as pessoas demonstram amor de maneiras diferentes. Algumas escrevem cartas, outras dão presentes. Eu, de alguma forma, estou transformando, aqui, carinho em linhas de código. E esse talvez seja apenas o meu jeito de te dizer que eu acredito em você.</p><p style="margin:0 0 18px;">Eu acredito no seu talento. Acredito na profissional que você está se tornando e, principalmente, na mulher que você é. Tenho certeza de que você ainda vai olhar para trás e se surpreender com o quanto cresceu, porque isso é apenas o começo.</p><p style="margin:0 0 18px;">Espero que um dia você seja grande demais para tudo isso. Que este site seja pequeno perto de tudo o que você conquistou. Que ele precise mudar dezenas de vezes para acompanhar a profissional extraordinária que você continuará se tornando. E, sinceramente, eu torço para que isso aconteça.</p><p style="margin:0 0 18px;">Mas existe algo que eu gostaria que você levasse consigo muito depois que esta mensagem desaparecer da sua tela.</p><p style="margin:0 0 18px;">Em alguns momentos, você vai se sentir imparável. Em outros, vai duvidar de si mesma. Haverá dias em que tudo dará certo e outros em que você vai pensar que ainda não chegou onde gostaria. Quando esses dias chegarem, eu espero que você se lembre destas palavras: eu continuo acreditando em você, inclusive nos dias em que você esquecer de acreditar em si.</p><p style="margin:0 0 18px;">Esse site foi criado para te ajudar a construir algo maior. Que ele cresça junto com você. Que seja palco de muitas conquistas, novas oportunidades e realizações que hoje nós nem conseguimos imaginar.</p><p style="margin:0 0 18px;">A vida muda, os planos mudam e as coisas evoluem com o tempo. Talvez um dia este site seja substituído por algo ainda melhor, deixe de existir ou se torne apenas uma boa lembrança do começo de uma linda história profissional. O que eu espero que nunca deixe de existir é a certeza de que você jamais precisará caminhar sozinha.</p><p style="margin:0 0 18px;">Eu estarei aqui. Celebrando as suas vitórias como se fossem minhas, te apoiando nos dias difíceis e sendo o primeiro a te lembrar do tamanho do seu potencial.</p></div>'
+    + '<div class="cf-divider" style="margin:30px 0 24px;" aria-hidden="true"><span class="l"></span><span class="d"></span><span class="r"></span></div>'
+    + '<p style="margin:0 0 4px;text-align:center;font:400 16px/1.7 Fraunces,serif;color:#F5D89B;">No fim das contas, esta mensagem foi programada para aparecer apenas uma vez.</p>'
+    + '<p style="margin:0 0 22px;text-align:center;font:italic 300 19px/1.5 Fraunces,serif;color:#C9A662;">O meu apoio, não.</p>'
+    + '<p style="margin:0 0 30px;text-align:center;font:italic 300 17px/1.8 Fraunces,serif;color:#C9A662;">Sempre.<br><span style="font-style:normal;font-size:14px;color:#8F8271;">Com todo o meu amor,</span><br>Jhonatha</p>'
+    + '<div style="display:flex;justify-content:center;"><button class="cf-primary" onclick="fecharBoasVindas()" style="max-width:300px;">Vamos começar</button></div>'
     + '</div></div>';
 }
 
@@ -194,10 +227,11 @@ function telaDashboard(){
 // ---------- handlers ----------
 window.setMode=function(m){ state.mode=m; state.error=''; render(); };
 window.onLogin=function(){
-  const email=(document.getElementById('l-email')||{}).value||'';
+  const user=((document.getElementById('l-user')||{}).value||'').trim().toLowerCase();
   const senha=(document.getElementById('l-senha')||{}).value||'';
-  if(!email.trim()||!senha){ state.error='Preencha e-mail e senha.'; render(); return; }
-  doLogin(email,senha);
+  if(!user||!senha){ state.error='Preencha usuário e senha.'; render(); return; }
+  // o usuário vira um e-mail interno invisível
+  doLogin(user+'@assessoria.confirmafest.com.br',senha);
 };
 window.onLoginNoivos=async function(){
   const user=((document.getElementById('n-user')||{}).value||'').trim().toLowerCase();
@@ -218,6 +252,10 @@ window.onLoginNoivos=async function(){
     const ev=data[0];
     location.href='evento.html?ev='+encodeURIComponent(ev.slug||ev.evento_id)+'&papel=noivos';
   }catch(e){ state.loading=false; state.error='Não foi possível entrar agora.'; render(); }
+};
+window.fecharBoasVindas=async function(){
+  state.boasVindas=false; render();
+  try{ if(state.meuId) await sb.from('assessoras').update({boas_vindas_em:new Date().toISOString()}).eq('id',state.meuId); }catch(_){}
 };
 window.logout=logout;
 
