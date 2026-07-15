@@ -32,6 +32,7 @@
 <body>
 <div id="app" style="min-height:100vh;"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
 <script>
 const SUPABASE_URL='https://qmxldxvkkhpvimjkgqvz.supabase.co';
 const SUPABASE_KEY='sb_publishable_OzsFX2OvynXqeVLkLcPCgA_P3t8Ej0v';
@@ -43,7 +44,7 @@ const esc=s=>(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"
 const norm=s=>(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
 const dig=s=>(s||'').replace(/\D/g,'');
 
-let S={papel:'assessora',perm:{},aba:'painel',ev:null,fams:[],busca:'',filtro:'total',loading:true,erro:'',addOpen:false,saved:false,criando:false,perms:null,disp:null,intervalo:8,
+let S={papel:'assessora',perm:{},aba:'painel',ev:null,fams:[],busca:'',filtro:'total',loading:true,erro:'',addOpen:false,saved:false,criando:false,imp:null,impBusy:false,perms:null,disp:null,intervalo:8,
   cfg:{min:8,max:25,lote:20,pausaMin:15,ritmo:'seguro'}};
 
 async function carregar(){
@@ -239,6 +240,162 @@ function abaPainel(){
     +buscaHTML()+listaHTML();
 }
 
+
+// ---------- import de planilha ----------
+function baixarModelo(){
+  const dados=[
+    ['Responsável','WhatsApp','Dependentes'],
+    ['Carlos Albuquerque','5521996140032','Marina Albuquerque, Pedro Albuquerque'],
+    ['Sofia Leal','5521991204471',''],
+    ['Roberto Duarte','5521988201145','Antônia Duarte, Bento Duarte']
+  ];
+  const ws=XLSX.utils.aoa_to_sheet(dados);
+  ws['!cols']=[{wch:30},{wch:20},{wch:50}];
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Convidados');
+  XLSX.writeFile(wb,'modelo-convidados-'+(S.ev.slug||'evento')+'.xlsx');
+}
+
+function acharCol(cabecalho, alternativas){
+  for(let i=0;i<cabecalho.length;i++){
+    const c=norm(String(cabecalho[i]||''));
+    if(alternativas.some(a=>c.includes(a))) return i;
+  }
+  return -1;
+}
+
+async function lerPlanilha(file){
+  S.impBusy=true; r();
+  try{
+    const buf=await file.arrayBuffer();
+    const wb=XLSX.read(buf,{type:'array'});
+    const ws=wb.Sheets[wb.SheetNames[0]];
+    const linhas=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+    if(!linhas.length) throw new Error('A planilha está vazia.');
+
+    // acha o cabeçalho
+    let iCab=-1;
+    for(let i=0;i<Math.min(linhas.length,10);i++){
+      const l=linhas[i].map(x=>norm(String(x)));
+      if(l.some(c=>c.includes('respons')||c.includes('nome')) && l.some(c=>c.includes('whats')||c.includes('telefone')||c.includes('celular'))){ iCab=i; break; }
+    }
+    if(iCab<0) throw new Error('Não encontrei as colunas. A planilha precisa ter "Responsável" e "WhatsApp". Baixe o modelo.');
+
+    const cab=linhas[iCab];
+    const cN=acharCol(cab,['respons','nome']);
+    const cT=acharCol(cab,['whats','telefone','celular','fone']);
+    const cD=acharCol(cab,['depend','acompanh','familia','convidad']);
+
+    const familias=[]; const erros=[]; const vistos={};
+    for(let i=iCab+1;i<linhas.length;i++){
+      const l=linhas[i]; if(!l||!l.length) continue;
+      const nome=String(l[cN]||'').trim();
+      const tel=dig(String(l[cT]||''));
+      const depsRaw=cD>=0?String(l[cD]||''):'';
+      if(!nome && !tel) continue;
+      if(!nome){ erros.push('Linha '+(i+1)+': sem nome do responsável.'); continue; }
+      if(tel.length<10){ erros.push('Linha '+(i+1)+': telefone inválido ('+nome+').'); continue; }
+      if(vistos[tel]){ erros.push('Linha '+(i+1)+': telefone repetido na planilha ('+nome+').'); continue; }
+      vistos[tel]=true;
+      const deps=depsRaw.split(/[,;/|]|\n/).map(s=>s.trim()).filter(Boolean);
+      familias.push({telefone:tel,nome:nome,dependentes:deps});
+    }
+    if(!familias.length) throw new Error('Nenhuma linha válida encontrada. '+(erros[0]||''));
+
+    // compara com o que já existe
+    const atuais={}; S.fams.forEach(f=>{ atuais[dig(f.tel)]=f; });
+    const novos=[], alterados=[], iguais=[];
+    familias.forEach(f=>{
+      const at=atuais[f.telefone];
+      if(!at){ novos.push(f); return; }
+      const mud=[];
+      if(norm(at.nome)!==norm(f.nome)) mud.push({campo:'Nome',de:at.nome,para:f.nome});
+      const nomesAtuais=at.pessoas.filter(p=>!p.resp).map(p=>norm(p.nome));
+      const novosDeps=f.dependentes.filter(d=>!nomesAtuais.includes(norm(d)));
+      if(novosDeps.length) mud.push({campo:'Novos dependentes',de:'—',para:novosDeps.join(', ')});
+      if(mud.length) alterados.push({...f,at:at,mudancas:mud}); else iguais.push(f);
+    });
+    const naPlanilha={}; familias.forEach(f=>naPlanilha[f.telefone]=true);
+    const sumidos=S.fams.filter(f=>!naPlanilha[dig(f.tel)]).map(f=>({
+      ...f, temResposta:f.pessoas.some(p=>p.st!=='pendente'), manter:true
+    }));
+
+    S.imp={arquivo:file.name,novos,alterados,iguais,sumidos,erros};
+    S.impBusy=false; r();
+  }catch(e){ S.impBusy=false; S.imp=null; r(); alert('Erro ao ler a planilha:\n\n'+(e.message||e)); }
+}
+
+async function aplicarImport(){
+  const I=S.imp; if(!I) return;
+  const remover=I.sumidos.filter(s=>!s.manter && !s.temResposta).map(s=>s.id);
+  const familias=[...I.novos, ...I.alterados.map(a=>({telefone:a.telefone,nome:a.nome,dependentes:a.dependentes}))];
+  if(!familias.length && !remover.length){ alert('Nada para aplicar.'); return; }
+  let msg='Aplicar as mudanças?\n\n';
+  if(I.novos.length) msg+='• '+I.novos.length+' família(s) nova(s)\n';
+  if(I.alterados.length) msg+='• '+I.alterados.length+' atualizada(s)\n';
+  if(remover.length) msg+='• '+remover.length+' removida(s)\n';
+  msg+='\nConfirmações já feitas nunca são apagadas.';
+  if(!confirm(msg)) return;
+  S.impBusy=true; r();
+  try{
+    const {data,error}=await sb.rpc('importar_convidados',{p_evento_id:S.ev.id,p_familias:familias,p_remover:remover.length?remover:null});
+    if(error) throw error;
+    const res=(data&&data[0])||{};
+    S.imp=null; S.impBusy=false;
+    await carregar();
+    alert('Import concluído!\n\n'+(res.novos||0)+' nova(s)\n'+(res.atualizados||0)+' atualizada(s)\n'+(res.removidos||0)+' removida(s)'+((res.ignorados||0)?'\n'+res.ignorados+' ignorada(s)':''));
+  }catch(e){ S.impBusy=false; r(); alert('Erro ao aplicar: '+(e.message||e)); }
+}
+
+function telaRevisao(){
+  const I=S.imp;
+  const bloco=(t,cor,n,inner)=>'<div class="card" style="padding:20px;margin-bottom:12px;border-color:'+cor+'33;"><p style="margin:0 0 12px;font:400 18px/1 Fraunces,serif;color:'+cor+';">'+t+' <span style="font:600 11px/1 Inter,sans-serif;letter-spacing:.1em;color:#8F8271;">('+n+')</span></p>'+inner+'</div>';
+  let out='<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px;flex-wrap:wrap;">'
+    +'<div><p style="margin:0;font:400 20px/1.2 Fraunces,serif;color:#F5D89B;">Revisão das mudanças</p>'
+    +'<p style="margin:4px 0 0;font:400 12px/1.5 Inter,sans-serif;color:#8F8271;">'+esc(I.arquivo)+' · nada é aplicado até você aprovar.</p></div>'
+    +'<button class="btn" onclick="cancelarImport()">Cancelar</button></div>'
+    +'<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin-bottom:16px;">'
+    +[['Novos',I.novos.length,'#A7D9BF'],['Alterados',I.alterados.length,'#C9A662'],['Sumidos',I.sumidos.length,'#E0A294'],['Sem mudança',I.iguais.length,'#8F8271']]
+      .map(x=>'<div style="text-align:center;padding:12px 6px;background:rgba(10,8,7,.45);border-radius:6px;"><span style="display:block;font:400 22px/1 Fraunces,serif;color:'+x[2]+';">'+x[1]+'</span><span style="display:block;margin-top:4px;font:600 8px/1.3 Inter,sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#8F8271;">'+x[0]+'</span></div>').join('')
+    +'</div>';
+
+  if(I.erros.length) out+='<div class="card" style="padding:16px;margin-bottom:12px;border-color:rgba(197,110,92,.35);"><p style="margin:0 0 8px;font:600 10px/1 Inter,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:#E0A294;">'+I.erros.length+' linha(s) ignorada(s)</p>'+I.erros.slice(0,8).map(e=>'<p style="margin:0 0 4px;font:400 12px/1.5 Inter,sans-serif;color:#8F8271;">'+esc(e)+'</p>').join('')+(I.erros.length>8?'<p style="margin:6px 0 0;font:400 11px/1 Inter,sans-serif;color:#8F8271;">… e mais '+(I.erros.length-8)+'</p>':'')+'</div>';
+
+  if(I.novos.length) out+=bloco('Serão adicionados','#A7D9BF',I.novos.length,
+    I.novos.slice(0,50).map(f=>'<div style="padding:8px 0;border-bottom:1px solid rgba(201,166,98,.07);"><span style="font:500 14px/1.4 Inter,sans-serif;color:#F3ECE0;">'+esc(f.nome)+'</span><span style="display:block;font:400 11px/1.5 Inter,sans-serif;color:#8F8271;">'+esc(f.telefone)+(f.dependentes.length?' · +'+f.dependentes.length+': '+esc(f.dependentes.join(', ')):' · sem dependentes')+'</span></div>').join('')
+    +(I.novos.length>50?'<p style="margin:8px 0 0;font:400 11px/1 Inter,sans-serif;color:#8F8271;">… e mais '+(I.novos.length-50)+'</p>':''));
+
+  if(I.alterados.length) out+=bloco('Serão atualizados','#C9A662',I.alterados.length,
+    I.alterados.map(a=>'<div style="padding:8px 0;border-bottom:1px solid rgba(201,166,98,.07);"><span style="font:500 14px/1.4 Inter,sans-serif;color:#F3ECE0;">'+esc(a.nome)+'</span>'
+      +a.mudancas.map(m=>'<span style="display:block;font:400 11px/1.6 Inter,sans-serif;color:#8F8271;">'+esc(m.campo)+': <span style="color:rgba(224,162,148,.8);">'+esc(m.de)+'</span> → <span style="color:#A7D9BF;">'+esc(m.para)+'</span></span>').join('')+'</div>').join(''));
+
+  if(I.sumidos.length) out+=bloco('Estão no sistema mas sumiram da planilha','#E0A294',I.sumidos.length,
+    '<p style="margin:0 0 12px;font:400 12px/1.6 Inter,sans-serif;color:#8F8271;">Nada é apagado sozinho. Escolha o que fazer com cada um. Quem já respondeu <strong style="color:#C9A662;">não pode ser removido</strong>.</p>'
+    +I.sumidos.map((s,i)=>'<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid rgba(201,166,98,.07);"><div><span style="font:500 14px/1.4 Inter,sans-serif;color:#F3ECE0;">'+esc(s.nome)+'</span><span style="display:block;font:400 11px/1.5 Inter,sans-serif;color:#8F8271;">'+esc(s.tel)+' · '+s.pessoas.length+' pessoa(s)'+(s.temResposta?' · <span style="color:#A7D9BF;">já respondeu</span>':'')+'</span></div>'
+      +(s.temResposta?'<span class="chip c-ok">Mantido</span>'
+        :'<div style="display:flex;gap:6px;"><button class="btn" style="min-height:34px;padding:0 11px;font-size:9px;'+(s.manter?'border-color:#C9A662;background:rgba(201,166,98,.14);color:#F5D89B;':'')+'" onclick="marcarSumido('+i+',true)">Manter</button>'
+        +'<button class="btn" style="min-height:34px;padding:0 11px;font-size:9px;'+(!s.manter?'border-color:rgba(197,110,92,.6);background:rgba(161,77,63,.2);color:#E0A294;':'')+'" onclick="marcarSumido('+i+',false)">Remover</button></div>')
+      +'</div>').join(''));
+
+  out+='<div style="display:flex;gap:10px;margin-top:20px;flex-wrap:wrap;">'
+    +'<button class="btn-p" onclick="aplicarImport()" '+(S.impBusy?'disabled':'')+'>'+(S.impBusy?'Aplicando…':'Aplicar mudanças')+'</button>'
+    +'<button class="btn" onclick="cancelarImport()">Cancelar</button></div>';
+  return out;
+}
+
+function zonaImport(){
+  return '<div class="card" style="padding:24px;margin-bottom:16px;">'
+    +'<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px;">'
+    +'<div><p style="margin:0;font:400 19px/1.2 Fraunces,serif;color:#F5D89B;">Importar planilha</p>'
+    +'<p style="margin:4px 0 0;font:400 12px/1.5 Inter,sans-serif;color:#8F8271;">Uma linha por família: Responsável · WhatsApp · Dependentes (separados por vírgula).</p></div>'
+    +'<button class="btn" onclick="baixarModelo()">Baixar modelo</button></div>'
+    +'<label for="arq" style="display:block;padding:30px 20px;text-align:center;border:1px dashed rgba(201,166,98,.35);border-radius:8px;cursor:pointer;background:rgba(10,8,7,.35);">'
+    +'<span style="display:block;font:500 14px/1.5 Inter,sans-serif;color:#C9A662;">'+(S.impBusy?'Lendo a planilha…':'Clique aqui ou arraste a planilha')+'</span>'
+    +'<span style="display:block;margin-top:5px;font:400 11px/1.5 Inter,sans-serif;color:#8F8271;">.xlsx, .xls ou .csv · nada é aplicado sem a sua revisão</span></label>'
+    +'<input id="arq" type="file" accept=".xlsx,.xls,.csv" onchange="onArquivo(this)" style="display:none;">'
+    +'</div>';
+}
+
 function abaConvidados(){
   const add=S.addOpen?'<div class="card" style="padding:20px;margin-bottom:16px;"><p style="margin:0 0 14px;font:400 18px/1 Fraunces,serif;color:#F5D89B;">Adicionar convidado</p>'
     +'<div style="display:flex;flex-direction:column;gap:10px;">'
@@ -247,7 +404,9 @@ function abaConvidados(){
     +'<input class="inp" id="a-deps" placeholder="Dependentes separados por vírgula (opcional)">'
     +'<div style="display:flex;gap:10px;margin-top:4px;"><button class="btn-p" onclick="addConvidado()">Salvar</button><button class="btn" onclick="toggleAdd(false)">Cancelar</button></div></div></div>':'';
   const podeAdd = S.papel!=='noivos' || S.perm.convidados;
-  return '<div style="display:flex;justify-content:flex-end;margin-bottom:14px;">'+((S.addOpen||!podeAdd)?'':'<button class="btn-p" onclick="toggleAdd(true)">+ Adicionar convidado</button>')+'</div>'
+  if(S.imp) return telaRevisao();
+  return (podeAdd?zonaImport():'')
+    +'<div style="display:flex;justify-content:flex-end;margin-bottom:14px;">'+((S.addOpen||!podeAdd)?'':'<button class="btn-p" onclick="toggleAdd(true)">+ Adicionar convidado</button>')+'</div>'
     +add+kpisHTML()+buscaHTML()+listaHTML();
 }
 
@@ -523,6 +682,11 @@ window.limpar=()=>{S.busca='';S.filtro='total';r();};
 window.toggleAdd=v=>{S.addOpen=v;r();};
 window.addConvidado=addConvidado; window.excluirFam=excluirFam; window.excluirPessoa=excluirPessoa;
 window.salvarCampo=salvarCampo; window.copiar=copiar;
+window.baixarModelo=baixarModelo;
+window.onArquivo=function(el){ if(el.files&&el.files[0]) lerPlanilha(el.files[0]); el.value=''; };
+window.cancelarImport=function(){ S.imp=null; r(); };
+window.marcarSumido=function(i,v){ if(S.imp&&S.imp.sumidos[i]) { S.imp.sumidos[i].manter=v; r(); } };
+window.aplicarImport=aplicarImport;
 window.sairNoivos=async function(){ await sb.auth.signOut(); location.href='index.html'; };
 window.inserirTag=function(tag){
   const t=document.getElementById('c-msg'); if(!t) return;
