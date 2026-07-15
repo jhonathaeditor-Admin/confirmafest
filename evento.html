@@ -43,7 +43,8 @@ const esc=s=>(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"
 const norm=s=>(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
 const dig=s=>(s||'').replace(/\D/g,'');
 
-let S={aba:'painel',ev:null,fams:[],busca:'',filtro:'total',loading:true,erro:'',addOpen:false,saved:false,perms:null,disp:null};
+let S={aba:'painel',ev:null,fams:[],busca:'',filtro:'total',loading:true,erro:'',addOpen:false,saved:false,perms:null,disp:null,intervalo:8,
+  cfg:{min:8,max:25,lote:20,pausaMin:15,ritmo:'seguro'}};
 
 async function carregar(){
   const {data:sess}=await sb.auth.getSession();
@@ -297,15 +298,30 @@ function abaGestao(){
 }
 
 // ---------- disparo ----------
-const INTERVALO=8; // segundos entre envios (anti-bloqueio)
+// intervalo entre envios (anti-bloqueio) — definido pela assessora na tela
 async function dispararTodos(){
   const alvos=S.fams.filter(f=>f.pessoas.some(p=>p.st==='pendente'));
   if(!alvos.length){ alert('Não há convidados pendentes para disparar.'); return; }
   if(S.ev.status!=='ativo'||!S.ev.rsvp){ alert('O evento precisa estar ATIVO com confirmações ABERTAS. Ajuste na aba Gestão.'); return; }
-  if(!confirm('Disparar convite para '+alvos.length+' responsável(is)?\n\nIntervalo de '+INTERVALO+'s entre envios para evitar bloqueio do WhatsApp.')) return;
-  S.disp={rodando:true,pausado:false,fila:alvos.map(f=>({id:f.id,nome:f.nome,tel:f.tel,estado:'espera'})),i:0,prox:0};
+  const est=estimativa(alvos.length);
+  const h=new Date().getHours();
+  let aviso='';
+  if(h<8||h>21) aviso='\n\nATENÇÃO: disparar fora do horário comercial (8h-21h) aumenta o risco de bloqueio.';
+  if(!confirm('Disparar convite para '+alvos.length+' responsável(is)?\n\nRitmo: '+S.cfg.min+'-'+S.cfg.max+'s (aleatório)\nLotes de '+S.cfg.lote+' com pausa de '+S.cfg.pausaMin+' min\nTempo estimado: '+est.txt+aviso)) return;
+  S.disp={rodando:true,pausado:false,fila:alvos.map(f=>({id:f.id,nome:f.nome,tel:f.tel,estado:'espera'})),i:0,prox:0,pausaLote:0,enviadosLote:0};
   r(); loopDisparo();
 }
+
+function rnd(min,max){ return Math.floor(Math.random()*(max-min+1))+min; }
+
+function estimativa(n){
+  const medio=(S.cfg.min+S.cfg.max)/2;
+  const pausas=Math.max(0,Math.floor((n-1)/S.cfg.lote));
+  const seg=n*medio + pausas*S.cfg.pausaMin*60;
+  const min=Math.round(seg/60);
+  return {min:min, txt: min<1?'menos de 1 minuto':(min<60?'cerca de '+min+' minutos':'cerca de '+(Math.floor(min/60))+'h'+(min%60?' '+(min%60)+'min':''))};
+}
+
 async function loopDisparo(){
   const d=S.disp;
   while(d.rodando && d.i<d.fila.length){
@@ -318,14 +334,33 @@ async function loopDisparo(){
       item.estado = (data&&data.ok) ? 'enviado' : 'falha';
       item.erro = data&&data.erro ? data.erro : '';
     }catch(e){ item.estado='falha'; item.erro=String(e.message||e); }
-    d.i++; r();
-    if(d.i<d.fila.length){
-      for(let s=INTERVALO;s>0;s--){ if(!d.rodando) return; if(d.pausado){ s++; } else { d.prox=s; r(); } await new Promise(x=>setTimeout(x,1000)); }
-      d.prox=0;
+    d.i++; d.enviadosLote++; r();
+
+    if(d.i>=d.fila.length) break;
+
+    // pausa longa entre lotes (comportamento humano)
+    if(d.enviadosLote>=S.cfg.lote){
+      d.enviadosLote=0;
+      for(let s=S.cfg.pausaMin*60;s>0;s--){
+        if(!d.rodando) return;
+        if(d.pausado){ s++; } else { d.pausaLote=s; r(); }
+        await new Promise(x=>setTimeout(x,1000));
+      }
+      d.pausaLote=0;
     }
+
+    // intervalo ALEATÓRIO entre envios (evita padrão de robô)
+    const espera=rnd(S.cfg.min,S.cfg.max);
+    for(let s=espera;s>0;s--){
+      if(!d.rodando) return;
+      if(d.pausado){ s++; } else { d.prox=s; r(); }
+      await new Promise(x=>setTimeout(x,1000));
+    }
+    d.prox=0;
   }
   d.rodando=false; r();
 }
+
 function pausarDisparo(v){ if(S.disp) { S.disp.pausado=v; r(); } }
 function pararDisparo(){ if(S.disp){ S.disp.rodando=false; r(); } }
 async function reenviar(id){
@@ -339,6 +374,34 @@ async function reenviar(id){
   r();
 }
 
+function painelEstrategia(n){
+  const est=estimativa(n);
+  const hora=new Date().getHours();
+  const foraHorario=hora<8||hora>21;
+  const rt=(k,lb,d)=>'<button class="btn" style="flex:1;min-width:120px;min-height:auto;padding:12px 10px;text-align:left;'+(S.cfg.ritmo===k?'border-color:#C9A662;background:rgba(201,166,98,.14);':'')+'" onclick="setRitmo(\''+k+'\')"><span style="display:block;font:600 11px/1 Inter,sans-serif;letter-spacing:.1em;text-transform:uppercase;color:'+(S.cfg.ritmo===k?'#F5D89B':'#C9A662')+';">'+lb+'</span><span style="display:block;margin-top:5px;font:400 10px/1.4 Inter,sans-serif;color:#8F8271;text-transform:none;letter-spacing:0;">'+d+'</span></button>';
+  const num=(campo,lb,v,sufixo)=>'<div><label style="display:block;margin-bottom:5px;font:600 8px/1 Inter,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:#8F8271;">'+lb+'</label><div style="display:flex;align-items:center;gap:6px;"><input class="inp" type="number" min="1" value="'+v+'" onchange="setCfg(\''+campo+'\',this.value)" style="width:72px;padding:8px;text-align:center;font-size:14px;"><span style="font:400 11px/1 Inter,sans-serif;color:#8F8271;">'+sufixo+'</span></div></div>';
+
+  return '<div style="padding:18px;background:rgba(10,8,7,.45);border:1px solid rgba(201,166,98,.15);border-radius:6px;margin-bottom:18px;">'
+    +'<p style="margin:0 0 4px;font:600 9px/1 Inter,sans-serif;letter-spacing:.16em;text-transform:uppercase;color:#C9A662;">Estratégia anti-bloqueio</p>'
+    +'<p style="margin:0 0 14px;font:400 11px/1.5 Inter,sans-serif;color:#8F8271;">O WhatsApp bloqueia quem parece robô. Os envios usam intervalo <strong style="color:#C9A662;">aleatório</strong>, simulam <strong style="color:#C9A662;">digitação</strong> e pausam em lotes.</p>'
+    +'<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;">'
+      +rt('lento','Lento','20-45s · lotes de 15 · pausa 20min. Mais seguro.')
+      +rt('seguro','Equilibrado','8-25s · lotes de 20 · pausa 15min. Recomendado.')
+      +rt('rapido','Rápido','4-10s · lotes de 30 · pausa 8min. Mais risco.')
+    +'</div>'
+    +'<div style="display:flex;flex-wrap:wrap;gap:14px;padding-top:14px;border-top:1px solid rgba(201,166,98,.1);">'
+      +num('min','Intervalo mín.',S.cfg.min,'seg')
+      +num('max','Intervalo máx.',S.cfg.max,'seg')
+      +num('lote','Enviar em lotes de',S.cfg.lote,'msgs')
+      +num('pausaMin','Pausa entre lotes',S.cfg.pausaMin,'min')
+    +'</div>'
+    +'<p style="margin:14px 0 0;font:400 12px/1.5 Inter,sans-serif;color:#F5D89B;">'+n+' envio'+(n!==1?'s':'')+' · intervalo '+S.cfg.min+'-'+S.cfg.max+'s · lotes de '+S.cfg.lote+' → <strong>'+est.txt+'</strong></p>'
+    +(S.cfg.min<5?'<p style="margin:10px 0 0;padding:9px 11px;background:rgba(161,77,63,.12);border-left:2px solid #A14D3F;border-radius:3px;font:400 11px/1.5 Inter,sans-serif;color:#E0A294;">Intervalo abaixo de 5s aumenta muito o risco de bloqueio.</p>':'')
+    +(foraHorario?'<p style="margin:10px 0 0;padding:9px 11px;background:rgba(161,77,63,.12);border-left:2px solid #A14D3F;border-radius:3px;font:400 11px/1.5 Inter,sans-serif;color:#E0A294;">Agora são '+hora+'h. Disparar fora do horário comercial (8h-21h) é sinal de robô — prefira o horário comercial.</p>':'')
+    +(n>60?'<p style="margin:10px 0 0;padding:9px 11px;background:rgba(201,166,98,.08);border-left:2px solid rgba(201,166,98,.4);border-radius:3px;font:400 11px/1.5 Inter,sans-serif;color:#8F8271;">Lista grande ('+n+' envios). Se o número é novo, comece com 20-30 por dia e aumente aos poucos (aquecimento). Números novos que disparam em massa são bloqueados rápido.</p>':'')
+    +'</div>';
+}
+
 function abaDisparo(){
   const pend=S.fams.filter(f=>f.pessoas.some(p=>p.st==='pendente'));
   const d=S.disp;
@@ -350,8 +413,9 @@ function abaDisparo(){
     pend.forEach(f=>{ lista+='<div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid rgba(201,166,98,.08);"><span style="font:400 14px/1 Inter,sans-serif;color:#F3ECE0;">'+esc(f.nome)+'</span><span style="font:400 12px/1 Inter,sans-serif;color:#8F8271;">'+esc(f.tel)+'</span></div>'; });
     return '<div style="margin-bottom:16px;">'+selo+'</div>'
       +'<div class="card" style="padding:24px;"><p style="margin:0 0 4px;font:400 20px/1 Fraunces,serif;color:#F5D89B;">Disparo dos convites</p>'
-      +'<p style="margin:0 0 18px;font:400 12px/1.6 Inter,sans-serif;color:#8F8271;">Cada responsável recebe uma mensagem no WhatsApp com o link único da família. Intervalo de '+INTERVALO+'s entre envios para evitar bloqueio.</p>'
-      +(pend.length?'<p style="margin:0 0 6px;font:600 9px/1 Inter,sans-serif;letter-spacing:.16em;text-transform:uppercase;color:#C9A662;">'+pend.length+' destinatário'+(pend.length!==1?'s':'')+'</p>'+lista
+      +'<p style="margin:0 0 18px;font:400 12px/1.6 Inter,sans-serif;color:#8F8271;">Cada responsável recebe uma mensagem no WhatsApp com o link único da família. Você define o intervalo entre os envios para evitar bloqueio do WhatsApp.</p>'
+      +(pend.length?painelEstrategia(pend.length)
+        +'<p style="margin:0 0 6px;font:600 9px/1 Inter,sans-serif;letter-spacing:.16em;text-transform:uppercase;color:#C9A662;">'+pend.length+' destinatário'+(pend.length!==1?'s':'')+'</p>'+lista
         +'<button class="btn-p" style="margin-top:20px;" onclick="dispararTodos()">Disparar '+pend.length+' convite'+(pend.length!==1?'s':'')+'</button>'
         :'<p style="margin:0;font:400 14px/1.6 Inter,sans-serif;color:#8F8271;">Todos os convidados já responderam — não há disparos pendentes.</p>')
       +'</div>';
@@ -378,7 +442,7 @@ function abaDisparo(){
     +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;"><p style="margin:0;font:400 20px/1 Fraunces,serif;color:#F5D89B;">'+(d.rodando?(d.pausado?'Disparo pausado':'Enviando…'):'Disparo concluído')+'</p>'
     +'<span style="font:400 13px/1 Inter,sans-serif;color:#8F8271;">'+feitos+' de '+d.fila.length+'</span></div>'
     +'<div style="height:6px;background:rgba(201,166,98,.12);border-radius:99px;overflow:hidden;margin-bottom:10px;"><div style="height:100%;width:'+pct+'%;background:linear-gradient(90deg,#9a7a3c,#F5D89B);transition:width .4s;"></div></div>'
-    +(d.rodando&&d.prox>0?'<p style="margin:0 0 14px;font:400 12px/1 Inter,sans-serif;color:#C9A662;">Próximo envio em '+d.prox+'s (intervalo anti-bloqueio)</p>':'<div style="height:14px;"></div>')
+    +(d.rodando&&d.pausaLote>0?'<p style="margin:0 0 14px;padding:9px 11px;background:rgba(201,166,98,.08);border-left:2px solid #C9A662;border-radius:3px;font:400 12px/1.5 Inter,sans-serif;color:#F5D89B;">Pausa entre lotes — retoma em '+Math.floor(d.pausaLote/60)+'min '+(d.pausaLote%60)+'s. Isso protege o número de bloqueio.</p>':(d.rodando&&d.prox>0?'<p style="margin:0 0 14px;font:400 12px/1 Inter,sans-serif;color:#C9A662;">Próximo envio em '+d.prox+'s (intervalo aleatório)</p>':'<div style="height:14px;"></div>'))
     +(d.rodando?'<div style="display:flex;gap:10px;margin-bottom:16px;">'+(d.pausado?'<button class="btn" onclick="pausarDisparo(false)">Retomar</button>':'<button class="btn" onclick="pausarDisparo(true)">Pausar</button>')+'<button class="btn" style="border-color:rgba(197,110,92,.4);color:#E0A294;" onclick="pararDisparo()">Parar</button></div>':'')
     +linhas+'</div>'+manual;
 }
@@ -407,6 +471,11 @@ window.toggleAdd=v=>{S.addOpen=v;r();};
 window.addConvidado=addConvidado; window.excluirFam=excluirFam; window.excluirPessoa=excluirPessoa;
 window.salvarCampo=salvarCampo; window.copiar=copiar;
 window.setStatus=setStatus; window.setRsvp=setRsvp; window.setLimite=setLimite; window.salvarPerms=salvarPerms; window.excluirEvento=excluirEvento;
+window.setRitmo=function(k){
+  const P={lento:{min:20,max:45,lote:15,pausaMin:20},seguro:{min:8,max:25,lote:20,pausaMin:15},rapido:{min:4,max:10,lote:30,pausaMin:8}};
+  S.cfg=Object.assign({},P[k],{ritmo:k}); r();
+};
+window.setCfg=function(campo,v){ const n=parseInt(v,10); if(!isNaN(n)&&n>0){ S.cfg[campo]=n; S.cfg.ritmo='custom'; r(); } };
 window.dispararTodos=dispararTodos; window.pausarDisparo=pausarDisparo; window.pararDisparo=pararDisparo; window.reenviar=reenviar;
 function r(){app.innerHTML=view();}
 carregar();
