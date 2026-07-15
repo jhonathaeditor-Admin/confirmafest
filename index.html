@@ -128,9 +128,15 @@ function telaLogin(){
       + '</div>'
       + '<button onclick="setMode(\'choice\')" style="margin-top:16px;background:none;border:none;color:#8F8271;font:400 12px/1 Inter,sans-serif;cursor:pointer;text-decoration:underline;text-underline-offset:4px;">← Voltar</button>';
   } else if(state.mode==='noivos'){
-    inner = '<p style="margin:0 0 16px;font:600 11px/1 Inter,sans-serif;letter-spacing:.24em;text-transform:uppercase;color:#C9A662;">Acesso dos noivos</p>'
-      + '<p style="margin:0 0 16px;font:400 13px/1.6 Inter,sans-serif;color:#8F8271;">Em breve — o acesso dos noivos será liberado quando esta tela for conectada.</p>'
-      + '<button onclick="setMode(\'choice\')" style="background:none;border:none;color:#8F8271;font:400 12px/1 Inter,sans-serif;cursor:pointer;text-decoration:underline;text-underline-offset:4px;">← Voltar</button>';
+    inner = '<p style="margin:0 0 4px;font:600 11px/1 Inter,sans-serif;letter-spacing:.24em;text-transform:uppercase;color:#C9A662;">Acesso dos noivos</p>'
+      + '<p style="margin:0 0 16px;font:400 12px/1.5 Inter,sans-serif;color:#8F8271;">Use o usuário e a senha que a assessoria criou para vocês.</p>'
+      + '<div style="width:100%;display:flex;flex-direction:column;gap:14px;text-align:left;">'
+      + '<input id="n-user" class="cf-input" type="text" placeholder="Usuário (ex: helena-rafael)" autocomplete="username" autocapitalize="none" spellcheck="false">'
+      + '<input id="n-senha" class="cf-input" type="password" placeholder="Senha" autocomplete="current-password">'
+      + (state.error?'<p role="alert" style="margin:0;padding:12px 14px;border:1px solid rgba(197,110,92,.45);border-left:2px solid #A14D3F;border-radius:3px;background:rgba(161,77,63,.12);color:#E0A294;font:400 13px/1.5 Inter,sans-serif;">'+esc(state.error)+'</p>':'')
+      + '<button class="cf-primary" onclick="onLoginNoivos()" '+(state.loading?'disabled':'')+'>'+(state.loading?'<span aria-hidden="true" style="display:inline-block;width:14px;height:14px;border:2px solid rgba(25,16,7,.3);border-top-color:#191007;border-radius:50%;animation:cfSpin .7s linear infinite;"></span>':'Entrar')+'</button>'
+      + '</div>'
+      + '<button onclick="setMode(\'choice\')" style="margin-top:16px;background:none;border:none;color:#8F8271;font:400 12px/1 Inter,sans-serif;cursor:pointer;text-decoration:underline;text-underline-offset:4px;">← Voltar</button>';
   } else if(state.mode==='convidado'){
     inner = '<p style="margin:0 0 16px;font:600 11px/1 Inter,sans-serif;letter-spacing:.24em;text-transform:uppercase;color:#C9A662;">Sou convidado</p>'
       + '<p style="margin:0 0 16px;font:400 13px/1.6 Inter,sans-serif;color:#8F8271;">Abra o link que você recebeu no WhatsApp, ou encontre seu convite pela página de confirmação.</p>'
@@ -192,6 +198,26 @@ window.onLogin=function(){
   const senha=(document.getElementById('l-senha')||{}).value||'';
   if(!email.trim()||!senha){ state.error='Preencha e-mail e senha.'; render(); return; }
   doLogin(email,senha);
+};
+window.onLoginNoivos=async function(){
+  const user=((document.getElementById('n-user')||{}).value||'').trim().toLowerCase();
+  const senha=(document.getElementById('n-senha')||{}).value||'';
+  if(!user||!senha){ state.error='Preencha usuário e senha.'; render(); return; }
+  if(state.loading) return;
+  state.loading=true; state.error=''; render();
+  try{
+    // o usuário vira um e-mail interno invisível
+    const email=user+'@noivos.confirmafest.com.br';
+    const {error}=await sb.auth.signInWithPassword({email:email,password:senha});
+    if(error){ state.loading=false; state.error='Usuário ou senha incorretos.'; render(); return; }
+    const {data,error:e2}=await sb.rpc('meu_evento_noivos');
+    if(e2||!data||!data.length){
+      await sb.auth.signOut();
+      state.loading=false; state.error='Este login não tem acesso a nenhum evento. Fale com a assessoria.'; render(); return;
+    }
+    const ev=data[0];
+    location.href='evento.html?ev='+encodeURIComponent(ev.slug||ev.evento_id)+'&papel=noivos';
+  }catch(e){ state.loading=false; state.error='Não foi possível entrar agora.'; render(); }
 };
 window.logout=logout;
 
