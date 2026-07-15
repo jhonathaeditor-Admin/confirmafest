@@ -553,8 +553,12 @@ window.setStatus=setStatus; window.setRsvp=setRsvp; window.setLimite=setLimite; 
   S.criando=true; r();
   try{
     const {data,error}=await sb.functions.invoke('criar-acesso-noivos',{body:{evento_id:S.ev.id,usuario:user,senha:senha,nome:nome.trim()||null}});
-    if(error) throw error;
-    if(!data||!data.ok) throw new Error(data&&data.erro?data.erro:'falha');
+    if(error){
+      let det=error.message||String(error);
+      try{ if(error.context&&error.context.json){ const b=await error.context.json(); if(b&&b.erro) det=b.erro; } }catch(_){}
+      throw new Error(det);
+    }
+    if(!data||!data.ok) throw new Error(data&&data.erro?data.erro:'falha desconhecida');
     S.criando=false;
     await carregarPerms(); await salvarPerms();
     alert('Acesso dos noivos criado!\n\nUsuário: '+user+'\nSenha: '+senha+'\n\nAnote e envie para o casal. Eles entram por "Sou noivo" na tela inicial.');
