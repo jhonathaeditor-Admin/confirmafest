@@ -33,6 +33,7 @@
 <div id="app" style="min-height:100vh;"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrious@4.0.2/dist/qrious.min.js"></script>
 <script>
 const SUPABASE_URL='https://qmxldxvkkhpvimjkgqvz.supabase.co';
 const SUPABASE_KEY='sb_publishable_OzsFX2OvynXqeVLkLcPCgA_P3t8Ej0v';
@@ -428,12 +429,52 @@ function abaConfig(){
     +'</div></div></div>';
 }
 
+function linkEvento(){ return 'https://confirmafest.com.br/confirmar.html?evento='+encodeURIComponent(S.ev.slug||''); }
+
+function desenharQR(){
+  const link=linkEvento();
+  const el=document.getElementById('qr-view'); if(!el||!window.QRious) return;
+  new QRious({ element:el, value:link, size:520, level:'H', background:'#FFFFFF', foreground:'#0A0807', padding:24 });
+}
+
+function baixarQR(tam){
+  const link=linkEvento();
+  const c=document.createElement('canvas');
+  new QRious({ element:c, value:link, size:tam, level:'H', background:'#FFFFFF', foreground:'#000000', padding:Math.round(tam*0.06) });
+  const a=document.createElement('a');
+  a.href=c.toDataURL('image/png');
+  a.download='qrcode-'+(S.ev.slug||'evento')+'-'+tam+'px.png';
+  a.click();
+}
+
 function abaAcesso(){
-  const link='https://jhonathaeditor-admin.github.io/confirmafest/confirmar.html?evento='+encodeURIComponent(S.ev.slug||'');
-  return '<div class="card" style="padding:26px;max-width:560px;"><p style="margin:0 0 8px;font:400 20px/1 Fraunces,serif;color:#F5D89B;">Link do convite</p>'
-    +'<p style="margin:0 0 16px;font:400 13px/1.6 Inter,sans-serif;color:#8F8271;">Cada responsável recebe este link com o próprio telefone. O convidado também pode se encontrar pela busca.</p>'
-    +'<div style="padding:12px 14px;background:rgba(10,8,7,.6);border:1px solid rgba(201,166,98,.2);border-radius:6px;margin-bottom:14px;word-break:break-all;font:400 12px/1.5 Inter,sans-serif;color:#C9A662;">'+esc(link)+'</div>'
-    +'<button class="btn-p" onclick="copiar(\''+link+'\')">Copiar link</button></div>';
+  const link=linkEvento();
+  setTimeout(desenharQR,60);
+  return '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;">'
+
+    // QR
+    +'<div class="card" style="padding:26px;text-align:center;">'
+    +'<p style="margin:0 0 4px;font:400 20px/1 Fraunces,serif;color:#F5D89B;">QR Code do convite</p>'
+    +'<p style="margin:0 0 18px;font:400 12px/1.6 Inter,sans-serif;color:#8F8271;">Este QR é <strong style="color:#C9A662;">permanente</strong> — pode ser impresso no convite. Ele nunca muda.</p>'
+    +'<div style="display:inline-block;padding:14px;background:#fff;border-radius:8px;box-shadow:0 16px 40px rgba(0,0,0,.5);"><canvas id="qr-view" style="display:block;width:220px;height:220px;"></canvas></div>'
+    +'<p style="margin:16px 0 14px;font:400 12px/1.6 Inter,sans-serif;color:rgba(243,236,224,.7);">O convidado escaneia, digita o nome e o WhatsApp, e confirma a presença da família.</p>'
+    +'<div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">'
+    +'<button class="btn" onclick="baixarQR(1200)">Baixar PNG (impressão)</button>'
+    +'<button class="btn" onclick="baixarQR(600)">Baixar PNG (digital)</button>'
+    +'</div>'
+    +'<p style="margin:12px 0 0;font:400 11px/1.5 Inter,sans-serif;color:#8F8271;">Para impressão, use o de 1200px. Tamanho mínimo sugerido no convite: 2,5 cm.</p>'
+    +'</div>'
+
+    // link
+    +'<div class="card" style="padding:26px;">'
+    +'<p style="margin:0 0 4px;font:400 20px/1 Fraunces,serif;color:#F5D89B;">Link do convite</p>'
+    +'<p style="margin:0 0 16px;font:400 12px/1.6 Inter,sans-serif;color:#8F8271;">Mesmo endereço do QR. Serve para quem não recebeu o WhatsApp ou perdeu a mensagem.</p>'
+    +'<div style="padding:12px 14px;background:rgba(10,8,7,.6);border:1px solid rgba(201,166,98,.2);border-radius:6px;margin-bottom:14px;word-break:break-all;font:400 12px/1.6 Inter,sans-serif;color:#C9A662;">'+esc(link)+'</div>'
+    +'<button class="btn-p" onclick="copiar(\''+link+'\')">Copiar link</button>'
+    +'<div style="margin-top:22px;padding-top:18px;border-top:1px solid rgba(201,166,98,.12);">'
+    +'<p style="margin:0 0 8px;font:600 9px/1 Inter,sans-serif;letter-spacing:.16em;text-transform:uppercase;color:#C9A662;">Sugestão para o convite</p>'
+    +'<p style="margin:0;font:italic 300 14px/1.7 Fraunces,serif;color:rgba(243,236,224,.75);">"Confirme sua presença: aponte a câmera para o código ao lado."</p></div>'
+    +'</div></div>';
 }
 
 function abaGestao(){
@@ -683,6 +724,7 @@ window.toggleAdd=v=>{S.addOpen=v;r();};
 window.addConvidado=addConvidado; window.excluirFam=excluirFam; window.excluirPessoa=excluirPessoa;
 window.salvarCampo=salvarCampo; window.copiar=copiar;
 window.baixarModelo=baixarModelo;
+window.baixarQR=baixarQR;
 window.onArquivo=function(el){ if(el.files&&el.files[0]) lerPlanilha(el.files[0]); el.value=''; };
 window.cancelarImport=function(){ S.imp=null; r(); };
 window.marcarSumido=function(i,v){ if(S.imp&&S.imp.sumidos[i]) { S.imp.sumidos[i].manter=v; r(); } };
