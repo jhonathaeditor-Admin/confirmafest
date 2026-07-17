@@ -50,7 +50,7 @@ const SUPABASE_KEY = 'sb_publishable_OzsFX2OvynXqeVLkLcPCgA_P3t8Ej0v';
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const app = document.getElementById('app');
-let state = { boasVindas:false, screen:'login', mode:'choice', loading:false, error:'', events:[], nome:'Eloisa', createOpen:false, ehAdmin:false, assessoras:[], naOpen:false };
+let state = { boasVindas:false, screen:'login', mode:'choice', loading:false, error:'', events:[], nome:'Eloisa', createOpen:false, ehAdmin:false, assessoras:[], naOpen:false, ga:null };
 
 const goldText='background:linear-gradient(100deg,#C9A662,#F5D89B 55%,#C9A662);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:#C9A662;';
 const esc=s=>(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -106,7 +106,7 @@ async function logout(){ await sb.auth.signOut(); state.screen='login'; state.mo
 
 // ---------- telas ----------
 function view(){
-  if(state.screen==='dashboard') return telaDashboard()+(state.boasVindas?modalBoasVindas():'')+(state.createOpen?modalNovoEvento():'')+(state.naOpen?modalNovaAssessora():'');
+  if(state.screen==='dashboard') return telaDashboard()+(state.boasVindas?modalBoasVindas():'')+(state.createOpen?modalNovoEvento():'')+(state.naOpen?modalNovaAssessora():'')+(state.ga?modalGerenciar():'');
   return telaLogin();
 }
 
@@ -259,12 +259,26 @@ function secaoAssessoras(){
   if(!state.ehAdmin) return '';
   let linhas='';
   (state.assessoras||[]).forEach(a=>{
-    linhas += '<div style="display:flex;align-items:center;justify-content:space-between;gap:14px;padding:14px 18px;border:1px solid rgba(201,166,98,.14);border-radius:8px;background:linear-gradient(180deg,#1B150E,#17120D);flex-wrap:wrap;">'
-      + '<span style="display:flex;align-items:center;gap:12px;min-width:0;">'
-      + '<span aria-hidden="true" style="width:30px;height:30px;flex:none;border-radius:50%;background:linear-gradient(135deg,#2E6B4F,#1B150E);display:flex;align-items:center;justify-content:center;font:600 12px/1 Inter,sans-serif;color:#C9A662;border:1px solid rgba(201,166,98,.3);">'+esc((a.nome||'?')[0])+'</span>'
-      + '<span style="min-width:0;"><span style="display:block;font:400 16px/1.3 Fraunces,serif;color:#F3ECE0;">'+esc(a.nome)+(a.eh_admin?' <span style="font:600 8px/1 Inter,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:#C9A662;border:1px solid rgba(201,166,98,.4);border-radius:2px;padding:3px 6px;vertical-align:middle;">Admin</span>':'')+'</span>'
-      + '<span style="display:block;font:400 12px/1.5 Inter,sans-serif;color:#8F8271;">'+esc(a.email)+'</span></span></span>'
-      + '<span style="font:400 12px/1 Inter,sans-serif;color:#8F8271;white-space:nowrap;">'+a.eventos+(a.eventos===1?' evento':' eventos')+'</span>'
+    const inativa = a.ativa===false;
+    const podeMexer = !a.eh_admin;
+    let acoes='';
+    if(podeMexer){
+      acoes = '<span style="display:flex;align-items:center;gap:8px;flex:none;">'
+        + (inativa
+            ? '<button onclick="abrirGerenciar(\''+a.id+'\',\'reativar\')" style="background:none;border:1px solid rgba(87,166,124,.45);border-radius:3px;padding:8px 12px;min-height:36px;cursor:pointer;color:#57A67C;font:600 9px/1 Inter,sans-serif;letter-spacing:.12em;text-transform:uppercase;">Reativar</button>'
+            : '<button onclick="abrirGerenciar(\''+a.id+'\',\'inativar\')" style="background:none;border:1px solid rgba(201,166,98,.3);border-radius:3px;padding:8px 12px;min-height:36px;cursor:pointer;color:#8F8271;font:600 9px/1 Inter,sans-serif;letter-spacing:.12em;text-transform:uppercase;">Inativar</button>')
+        + '<button onclick="abrirGerenciar(\''+a.id+'\',\'excluir\')" style="background:none;border:1px solid rgba(161,77,63,.4);border-radius:3px;padding:8px 12px;min-height:36px;cursor:pointer;color:#A14D3F;font:600 9px/1 Inter,sans-serif;letter-spacing:.12em;text-transform:uppercase;">Excluir</button>'
+        + '</span>';
+    }
+    linhas += '<div style="display:flex;align-items:center;justify-content:space-between;gap:14px;padding:14px 18px;border:1px solid rgba(201,166,98,.14);border-radius:8px;background:linear-gradient(180deg,#1B150E,#17120D);flex-wrap:wrap;'+(inativa?'opacity:.5;':'')+'">'
+      + '<span style="display:flex;align-items:center;gap:12px;min-width:0;flex:1;">'
+      + '<span aria-hidden="true" style="width:30px;height:30px;flex:none;border-radius:50%;background:linear-gradient(135deg,'+(inativa?'#3A3630,#17120D':'#2E6B4F,#1B150E')+');display:flex;align-items:center;justify-content:center;font:600 12px/1 Inter,sans-serif;color:#C9A662;border:1px solid rgba(201,166,98,.3);">'+esc((a.nome||'?')[0])+'</span>'
+      + '<span style="min-width:0;"><span style="display:block;font:400 16px/1.3 Fraunces,serif;color:#F3ECE0;">'+esc(a.nome)
+      + (a.eh_admin?' <span style="font:600 8px/1 Inter,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:#C9A662;border:1px solid rgba(201,166,98,.4);border-radius:2px;padding:3px 6px;vertical-align:middle;">Admin</span>':'')
+      + (inativa?' <span style="font:600 8px/1 Inter,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:#8F8271;border:1px solid rgba(143,130,113,.4);border-radius:2px;padding:3px 6px;vertical-align:middle;">Inativa</span>':'')
+      + '</span>'
+      + '<span style="display:block;font:400 12px/1.5 Inter,sans-serif;color:#8F8271;">'+esc(a.email)+' · '+a.eventos+(a.eventos===1?' evento':' eventos')+' · '+a.convidados+(a.convidados===1?' convidado':' convidados')+'</span></span></span>'
+      + acoes
       + '</div>';
   });
 
@@ -276,6 +290,56 @@ function secaoAssessoras(){
     + '</div>'
     + '<div style="display:flex;flex-direction:column;gap:10px;">'+(linhas||'<p style="margin:0;font:400 13px/1.6 Inter,sans-serif;color:#8F8271;">Nenhuma assessora cadastrada ainda.</p>')+'</div>'
     + '</section>';
+}
+
+function modalGerenciar(){
+  const g = state.ga;
+  if(!g) return '';
+  const a = g.assessora;
+  const cancelar = '<button onclick="fecharGerenciar()" style="background:none;border:none;padding:10px 0;min-height:40px;cursor:pointer;color:#8F8271;font:400 12px/1 Inter,sans-serif;text-decoration:underline;text-underline-offset:4px;">Cancelar</button>';
+  const erro = state.gaErro?'<p role="alert" style="margin:0;padding:12px 14px;border:1px solid rgba(197,110,92,.45);border-left:2px solid #A14D3F;border-radius:3px;background:rgba(161,77,63,.12);color:#E0A294;font:400 13px/1.5 Inter,sans-serif;">'+esc(state.gaErro)+'</p>':'';
+  const spin = '<span aria-hidden="true" style="display:inline-block;width:14px;height:14px;border:2px solid rgba(25,16,7,.3);border-top-color:#191007;border-radius:50%;animation:cfSpin .7s linear infinite;"></span>';
+  let inner='';
+
+  if(g.acao==='inativar'){
+    inner = '<p style="margin:0 0 4px;font:600 10px/1 Inter,sans-serif;letter-spacing:.24em;text-transform:uppercase;color:#8F8271;">Inativar acesso</p>'
+      + '<h3 style="margin:0 0 16px;font:400 26px/1.2 Fraunces,serif;color:#F5D89B;">'+esc(a.nome)+'</h3>'
+      + '<p style="margin:0 0 8px;font:400 15px/1.7 Inter,sans-serif;color:rgba(243,236,224,.88);">Ela não vai mais conseguir entrar no sistema.</p>'
+      + '<p style="margin:0 0 20px;font:400 13px/1.7 Inter,sans-serif;color:#8F8271;">Nada é apagado — os '+a.eventos+(a.eventos===1?' evento':' eventos')+' e '+a.convidados+(a.convidados===1?' convidado':' convidados')+' ficam guardados. Você pode reativar quando quiser.</p>'
+      + erro
+      + '<div style="display:flex;flex-direction:column;gap:6px;margin-top:14px;">'
+      + '<button class="cf-primary" onclick="confirmarGerenciar()" '+(state.gaLoading?'disabled':'')+'>'+(state.gaLoading?spin:'Inativar acesso')+'</button>'+cancelar+'</div>';
+  }
+  else if(g.acao==='reativar'){
+    inner = '<p style="margin:0 0 4px;font:600 10px/1 Inter,sans-serif;letter-spacing:.24em;text-transform:uppercase;color:#8F8271;">Reativar acesso</p>'
+      + '<h3 style="margin:0 0 16px;font:400 26px/1.2 Fraunces,serif;color:#F5D89B;">'+esc(a.nome)+'</h3>'
+      + '<p style="margin:0 0 20px;font:400 15px/1.7 Inter,sans-serif;color:rgba(243,236,224,.88);">Ela volta a entrar no sistema com o usuário <span style="color:#F5D89B;font-weight:600;">'+esc(a.email)+'</span> e a mesma senha de antes.</p>'
+      + erro
+      + '<div style="display:flex;flex-direction:column;gap:6px;margin-top:14px;">'
+      + '<button class="cf-primary" onclick="confirmarGerenciar()" '+(state.gaLoading?'disabled':'')+'>'+(state.gaLoading?spin:'Reativar acesso')+'</button>'+cancelar+'</div>';
+  }
+  else { // excluir
+    inner = '<p style="margin:0 0 4px;font:600 10px/1 Inter,sans-serif;letter-spacing:.24em;text-transform:uppercase;color:#A14D3F;">Excluir para sempre</p>'
+      + '<h3 style="margin:0 0 16px;font:400 26px/1.2 Fraunces,serif;color:#F5D89B;">'+esc(a.nome)+'</h3>'
+      + '<div style="padding:14px 16px;border:1px solid rgba(161,77,63,.45);border-left:2px solid #A14D3F;border-radius:3px;background:rgba(161,77,63,.1);margin-bottom:18px;">'
+      + '<p style="margin:0 0 8px;font:600 13px/1.5 Inter,sans-serif;color:#E0A294;">Isto apaga tudo, sem volta:</p>'
+      + '<p style="margin:0;font:400 13px/1.8 Inter,sans-serif;color:rgba(243,236,224,.85);">· o login dela<br>· '+a.eventos+(a.eventos===1?' evento':' eventos')+'<br>· '+a.convidados+(a.convidados===1?' convidado':' convidados')+' e todas as confirmações</p></div>'
+      + '<p style="margin:0 0 16px;font:400 13px/1.7 Inter,sans-serif;color:#8F8271;">Se a ideia é só tirar o acesso dela, use <span style="color:#C9A662;">Inativar</span> — é reversível e não apaga nada.</p>'
+      + '<div style="display:flex;flex-direction:column;gap:14px;text-align:left;">'
+      + '<div><label for="ga-nome" style="display:block;margin-bottom:6px;font:600 10px/1 Inter,sans-serif;letter-spacing:.12em;text-transform:uppercase;color:#8F8271;">Digite <span style="color:#F5D89B;">'+esc(a.nome)+'</span> para confirmar</label>'
+      + '<input id="ga-nome" class="cf-input" type="text" autocapitalize="off" spellcheck="false" value="'+esc(state.gaNome||'')+'"></div>'
+      + '<div><label for="ga-user" style="display:block;margin-bottom:6px;font:600 10px/1 Inter,sans-serif;letter-spacing:.12em;text-transform:uppercase;color:#8F8271;">Seu usuário de admin</label>'
+      + '<input id="ga-user" class="cf-input" type="text" autocapitalize="none" spellcheck="false" autocomplete="username" value="'+esc(state.gaUser||'')+'"></div>'
+      + '<div><label for="ga-senha" style="display:block;margin-bottom:6px;font:600 10px/1 Inter,sans-serif;letter-spacing:.12em;text-transform:uppercase;color:#8F8271;">Sua senha de admin</label>'
+      + '<input id="ga-senha" class="cf-input" type="password" autocomplete="current-password" value="'+esc(state.gaSenha||'')+'"></div>'
+      + erro
+      + '<button onclick="confirmarGerenciar()" '+(state.gaLoading?'disabled':'')+' style="width:100%;min-height:52px;margin-top:6px;border:none;border-radius:3px;font:600 12px/1 Inter,sans-serif;letter-spacing:.2em;text-transform:uppercase;color:#F3ECE0;cursor:pointer;background:linear-gradient(115deg,#6E2E27,#A14D3F 50%,#6E2E27);box-shadow:0 12px 30px rgba(0,0,0,.5);">'+(state.gaLoading?'<span aria-hidden="true" style="display:inline-block;width:14px;height:14px;border:2px solid rgba(243,236,224,.3);border-top-color:#F3ECE0;border-radius:50%;animation:cfSpin .7s linear infinite;"></span>':'Excluir para sempre')+'</button>'
+      + cancelar + '</div>';
+  }
+
+  return '<div style="position:fixed;inset:0;z-index:160;background:rgba(10,8,7,.92);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;padding:24px;overflow-y:auto;animation:cfFadeIn .3s ease both;" onclick="if(event.target===this)fecharGerenciar()">'
+    + '<div style="max-width:460px;width:100%;margin:auto;padding:34px 30px 30px;background:linear-gradient(180deg,#1B150E 0%,#17120D 100%);border:1px solid rgba(201,166,98,.28);border-radius:10px;box-shadow:0 40px 110px rgba(0,0,0,.75);animation:cfFadeUp .4s cubic-bezier(.22,1,.36,1) both;">'
+    + inner + '</div></div>';
 }
 
 function modalNovaAssessora(){
@@ -384,6 +448,42 @@ window.salvarNovaAssessora=async function(){
     if(!r || !r.ok){ state.naLoading=false; state.naErro=(r && r.erro) ? r.erro : 'Não foi possível criar a assessora.'; render(); return; }
     state.naLoading=false; state.naOk={ usuario:usuario, senha:senha }; render();
   }catch(e){ console.error(e); state.naLoading=false; state.naErro='Não foi possível criar a assessora agora. Tente novamente.'; render(); }
+};
+window.abrirGerenciar=function(id, acao){
+  const a=(state.assessoras||[]).find(x=>x.id===id);
+  if(!a) return;
+  state.ga={ acao:acao, assessora:a };
+  state.gaErro=''; state.gaNome=''; state.gaUser=''; state.gaSenha=''; render();
+  setTimeout(()=>{ const c=document.getElementById('ga-nome'); if(c)c.focus(); },60);
+};
+window.fecharGerenciar=function(){ if(state.gaLoading) return; state.ga=null; state.gaErro=''; state.gaNome=''; state.gaUser=''; state.gaSenha=''; render(); };
+window.confirmarGerenciar=async function(){
+  if(state.gaLoading || !state.ga) return;
+  const g=state.ga;
+  const corpo={ acao:g.acao, assessora_id:g.assessora.id };
+  if(g.acao==='excluir'){
+    const nome=((document.getElementById('ga-nome')||{}).value||'').trim();
+    const user=((document.getElementById('ga-user')||{}).value||'').trim().toLowerCase();
+    const senha=(document.getElementById('ga-senha')||{}).value||'';
+    state.gaNome=nome; state.gaUser=user; state.gaSenha=senha;
+    if(nome!==String(g.assessora.nome).trim()){ state.gaErro='O nome digitado não confere.'; render(); return; }
+    if(!user||!senha){ state.gaErro='Informe seu usuário e senha de administrador.'; render(); return; }
+    corpo.nome_confirmacao=nome; corpo.usuario_admin=user; corpo.senha_admin=senha;
+  }
+  state.gaLoading=true; state.gaErro=''; render();
+  try{
+    const { data:{ session } } = await sb.auth.getSession();
+    if(!session){ state.gaLoading=false; state.gaErro='Sua sessão expirou. Entre novamente.'; render(); return; }
+    const resp = await fetch(SUPABASE_URL+'/functions/v1/gerenciar-assessora',{
+      method:'POST',
+      headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer '+session.access_token, 'apikey':SUPABASE_KEY },
+      body: JSON.stringify(corpo)
+    });
+    const r = await resp.json();
+    if(!r || !r.ok){ state.gaLoading=false; state.gaErro=(r && r.erro) ? r.erro : 'Não foi possível concluir.'; render(); return; }
+    state.gaLoading=false; state.ga=null; state.gaNome=''; state.gaUser=''; state.gaSenha=''; render();
+    await carregarDashboard();
+  }catch(e){ console.error(e); state.gaLoading=false; state.gaErro='Não foi possível concluir agora. Tente novamente.'; render(); }
 };
 window.fecharBoasVindas=async function(){
   state.boasVindas=false; render();
