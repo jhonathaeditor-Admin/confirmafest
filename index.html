@@ -102,7 +102,7 @@ async function logout(){ await sb.auth.signOut(); state.screen='login'; state.mo
 
 // ---------- telas ----------
 function view(){
-  if(state.screen==='dashboard') return telaDashboard()+(state.boasVindas?modalBoasVindas():'');
+  if(state.screen==='dashboard') return telaDashboard()+(state.boasVindas?modalBoasVindas():'')+(state.createOpen?modalNovoEvento():'');
   return telaLogin();
 }
 
@@ -205,7 +205,8 @@ function telaDashboard(){
 
   const vazio = '<div style="margin-top:30px;padding:48px 28px;text-align:center;border:1px dashed rgba(201,166,98,.25);border-radius:10px;">'
     + '<h3 style="margin:0 0 10px;font:400 20px/1.3 Fraunces,serif;color:#F5D89B;">Nenhum evento ainda</h3>'
-    + '<p style="margin:0;font:400 14px/1.7 Inter,sans-serif;color:#8F8271;">Crie o primeiro evento, importe a lista de convidados e dispare os convites pelo WhatsApp.</p></div>';
+    + '<p style="margin:0 0 24px;font:400 14px/1.7 Inter,sans-serif;color:#8F8271;">Crie o primeiro evento, importe a lista de convidados e dispare os convites pelo WhatsApp.</p>'
+    + '<div style="display:flex;justify-content:center;"><button class="cf-primary" onclick="abrirNovoEvento()" style="max-width:260px;">Criar primeiro evento</button></div></div>';
 
   return '<div style="min-height:100vh;display:flex;flex-direction:column;animation:cfFadeIn .6s ease both;">'
     + '<header style="display:flex;align-items:center;justify-content:space-between;padding:22px 26px;border-bottom:1px solid rgba(201,166,98,.12);">'
@@ -214,14 +215,39 @@ function telaDashboard(){
     + '<button onclick="logout()" style="background:none;border:1px solid rgba(201,166,98,.3);border-radius:3px;padding:8px 16px;min-height:40px;cursor:pointer;color:#8F8271;font:600 10px/1 Inter,sans-serif;letter-spacing:.14em;text-transform:uppercase;">Sair</button></span>'
     + '</header>'
     + '<main style="flex:1;max-width:1080px;width:100%;margin:0 auto;padding:44px 26px 80px;">'
+    + '<div style="display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap;">'
+    + '<div>'
     + '<p style="margin:0 0 6px;font:600 10px/1 Inter,sans-serif;letter-spacing:.24em;text-transform:uppercase;color:#8F8271;">Seus eventos</p>'
     + '<h2 style="margin:0 0 8px;font:400 clamp(30px,6vw,42px)/1.1 Fraunces,serif;color:#F3ECE0;">'+saudacao()+', '+esc(state.nome)+'.</h2>'
+    + (cheio?'<p style="margin:0;font:400 14px/1.6 Inter,sans-serif;color:#8F8271;">'+state.events.length+(state.events.length===1?' celebração sob os seus cuidados.':' celebrações sob os seus cuidados.')+'</p>':'')
+    + '</div>'
+    + (cheio?'<button onclick="abrirNovoEvento()" style="background:none;border:1px solid rgba(201,166,98,.4);border-radius:3px;padding:12px 20px;min-height:46px;cursor:pointer;color:#C9A662;font:600 10px/1 Inter,sans-serif;letter-spacing:.16em;text-transform:uppercase;white-space:nowrap;transition:all .2s ease;">+ Novo evento</button>':'')
+    + '</div>'
     + (cheio
-        ? '<p style="margin:0 0 30px;font:400 14px/1.6 Inter,sans-serif;color:#8F8271;">'+state.events.length+(state.events.length===1?' celebração sob os seus cuidados.':' celebrações sob os seus cuidados.')+'</p><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;">'+cards+'</div>'
+        ? '<div style="margin-top:30px;display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;">'+cards+'</div>'
         : vazio)
     + '</main>'
     + '<footer style="padding:22px 26px;border-top:1px solid rgba(201,166,98,.1);text-align:center;font:400 11px/1 Inter,sans-serif;color:rgba(143,130,113,.6);">confirmafest.com.br</footer>'
     + '</div>';
+}
+
+function modalNovoEvento(){
+  return '<div style="position:fixed;inset:0;z-index:150;background:rgba(10,8,7,.9);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;padding:24px;overflow-y:auto;animation:cfFadeIn .3s ease both;" onclick="if(event.target===this)fecharNovoEvento()">'
+    + '<div style="max-width:460px;width:100%;margin:auto;padding:34px 30px 30px;background:linear-gradient(180deg,#1B150E 0%,#17120D 100%);border:1px solid rgba(201,166,98,.28);border-radius:10px;box-shadow:0 40px 110px rgba(0,0,0,.7);animation:cfFadeUp .4s cubic-bezier(.22,1,.36,1) both;">'
+    + '<p style="margin:0 0 4px;font:600 10px/1 Inter,sans-serif;letter-spacing:.24em;text-transform:uppercase;color:#8F8271;">Nova celebração</p>'
+    + '<h3 style="margin:0 0 22px;font:400 26px/1.2 Fraunces,serif;color:#F5D89B;">Criar evento</h3>'
+    + '<div style="display:flex;flex-direction:column;gap:14px;text-align:left;">'
+    + '<div><label for="ne-casal" style="display:block;margin-bottom:6px;font:600 10px/1 Inter,sans-serif;letter-spacing:.12em;text-transform:uppercase;color:#8F8271;">Nome do casal *</label>'
+    + '<input id="ne-casal" class="cf-input" type="text" placeholder="Ex: Helena &amp; Rafael" autocapitalize="words" value="'+esc(state.neCasal||'')+'"></div>'
+    + '<div><label for="ne-data" style="display:block;margin-bottom:6px;font:600 10px/1 Inter,sans-serif;letter-spacing:.12em;text-transform:uppercase;color:#8F8271;">Data do casamento</label>'
+    + '<input id="ne-data" class="cf-input" type="date" value="'+esc(state.neData||'')+'"></div>'
+    + '<div><label for="ne-local" style="display:block;margin-bottom:6px;font:600 10px/1 Inter,sans-serif;letter-spacing:.12em;text-transform:uppercase;color:#8F8271;">Local</label>'
+    + '<input id="ne-local" class="cf-input" type="text" placeholder="Ex: Casa das Pedras — Itaipava, RJ" value="'+esc(state.neLocal||'')+'"></div>'
+    + '<p style="margin:0;font:400 12px/1.6 Inter,sans-serif;color:#8F8271;">O horário e a mensagem do convite você ajusta depois, na aba Configuração do evento.</p>'
+    + (state.neErro?'<p role="alert" style="margin:0;padding:12px 14px;border:1px solid rgba(197,110,92,.45);border-left:2px solid #A14D3F;border-radius:3px;background:rgba(161,77,63,.12);color:#E0A294;font:400 13px/1.5 Inter,sans-serif;">'+esc(state.neErro)+'</p>':'')
+    + '<button class="cf-primary" onclick="salvarNovoEvento()" '+(state.neLoading?'disabled':'')+' style="margin-top:6px;">'+(state.neLoading?'<span aria-hidden="true" style="display:inline-block;width:14px;height:14px;border:2px solid rgba(25,16,7,.3);border-top-color:#191007;border-radius:50%;animation:cfSpin .7s linear infinite;"></span>':'Criar evento')+'</button>'
+    + '<button onclick="fecharNovoEvento()" style="background:none;border:none;padding:10px 0;min-height:40px;cursor:pointer;color:#8F8271;font:400 12px/1 Inter,sans-serif;text-decoration:underline;text-underline-offset:4px;">Cancelar</button>'
+    + '</div></div></div>';
 }
 
 // ---------- handlers ----------
@@ -252,6 +278,31 @@ window.onLoginNoivos=async function(){
     const ev=data[0];
     location.href='evento.html?ev='+encodeURIComponent(ev.slug||ev.evento_id)+'&papel=noivos';
   }catch(e){ state.loading=false; state.error='Não foi possível entrar agora.'; render(); }
+};
+window.abrirNovoEvento=function(){ state.createOpen=true; state.neErro=''; state.neCasal=''; state.neData=''; state.neLocal=''; render(); setTimeout(()=>{const c=document.getElementById('ne-casal'); if(c)c.focus();},60); };
+window.fecharNovoEvento=function(){ if(state.neLoading) return; state.createOpen=false; state.neErro=''; render(); };
+window.salvarNovoEvento=async function(){
+  if(state.neLoading) return;
+  const casal=((document.getElementById('ne-casal')||{}).value||'').trim();
+  const data=((document.getElementById('ne-data')||{}).value||'').trim();
+  const local=((document.getElementById('ne-local')||{}).value||'').trim();
+  // guarda o que já foi digitado, pra não perder se der erro
+  state.neCasal=casal; state.neData=data; state.neLocal=local;
+  if(!casal){ state.neErro='Digite o nome do casal.'; render(); return; }
+  state.neLoading=true; state.neErro=''; render();
+  try{
+    const { data:{ session } } = await sb.auth.getSession();
+    if(!session){ state.neLoading=false; state.neErro='Sua sessão expirou. Entre novamente.'; render(); return; }
+    const resp = await fetch(SUPABASE_URL+'/functions/v1/criar-evento',{
+      method:'POST',
+      headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer '+session.access_token, 'apikey':SUPABASE_KEY },
+      body: JSON.stringify({ casal:casal, data_evento:data||null, local:local||null })
+    });
+    const r = await resp.json();
+    if(!r || !r.ok){ state.neLoading=false; state.neErro=(r && r.erro) ? r.erro : 'Não foi possível criar o evento.'; render(); return; }
+    // deu certo: vai direto pro painel do evento novo
+    location.href='evento.html?ev='+encodeURIComponent(r.evento.slug||r.evento.id);
+  }catch(e){ console.error(e); state.neLoading=false; state.neErro='Não foi possível criar o evento agora. Tente novamente.'; render(); }
 };
 window.fecharBoasVindas=async function(){
   state.boasVindas=false; render();
